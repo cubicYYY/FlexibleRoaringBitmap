@@ -1,0 +1,11 @@
+# clang-format configuration
+BasedOnStyle: Google
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AllowShortIfStatementsOnASingleLine: false
+BreakBeforeBraces: Attach
+ColumnLimit: 80
+ContinuationIndentWidth: 4
+IndentCaseLabels: true
+AccessModifierOffset: -4
