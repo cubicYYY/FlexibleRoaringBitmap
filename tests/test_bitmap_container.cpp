@@ -1,14 +1,13 @@
 #include <gtest/gtest.h>
+
 #include "bitmap_container.h"
 
 namespace froaring {
-    class BitmapContainerTest : public ::testing::Test {
+class BitmapContainerTest : public ::testing::Test {
 protected:
     BitmapContainer<uint64_t, 8> container;
 
-    void SetUp() override {
-        container.clear();
-    }
+    void SetUp() override { container.clear(); }
 };
 
 TEST_F(BitmapContainerTest, TestSetAndTest) {
@@ -43,8 +42,7 @@ TEST_F(BitmapContainerTest, TestTestAndSet) {
     EXPECT_FALSE(container.test_and_set(255));
 }
 
-
-}
+}  // namespace froaring
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

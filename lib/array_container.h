@@ -54,6 +54,29 @@ public:
         return pos < size && vals[pos] == num;
     }
 
+    bool test_and_set(DataType num) {
+        bool was_set;
+        DataType pos;
+        if (!size) {
+            was_set = false;
+        } else {
+            pos = lower_bound(num);
+            was_set = (pos < size && vals[pos] == num);
+        }
+
+        if (was_set) return false;
+
+        if (size == capacity) expand();
+
+        std::memmove(&vals[pos + 1], &vals[pos],
+                     (size - pos) * sizeof(DataType));
+
+        vals[pos] = num;
+        ++size;
+
+        return true;
+    }
+
     DataType cardinality() const { return size; }
 
 private:

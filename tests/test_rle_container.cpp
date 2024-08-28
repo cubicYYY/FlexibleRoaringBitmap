@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include "rle_container.h"
 
 namespace froaring {
@@ -7,9 +8,7 @@ class RLEContainerTest : public ::testing::Test {
 protected:
     RLEContainer<uint64_t, 8> container;
 
-    void SetUp() override {
-        container.clear();
-    }
+    void SetUp() override { container.clear(); }
 };
 
 TEST_F(RLEContainerTest, SetSingleValue) {
@@ -58,7 +57,7 @@ TEST_F(RLEContainerTest, ResetValueInRun) {
     container.set(253);
     container.set(252);
     container.set(251);
-    
+
     container.reset(7);
     container.reset(253);
 

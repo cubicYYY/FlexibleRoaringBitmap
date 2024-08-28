@@ -46,37 +46,7 @@ public:
             num <= runs[pos].second) {
             return;  // already set, do nothing.
         }
-        // If the value is next to the previous run's end (and need merging)
-        bool merge_prev = (num > 0 && num - 1 == runs[pos].second);
-        // If the value is next to the next run's start (and need merging)
-        bool merge_next = (pos < run_count - 1 && runs[pos + 1].first > 0 &&
-                           runs[pos + 1].first - 1 == num);
-        if (merge_prev && merge_next) {  // [a,num-1] + num + [num+1, b]
-
-            runs[pos].second = runs[pos + 1].second;
-            std::memmove(&runs[pos + 1], &runs[pos + 2],
-                         (run_count - pos - 1) * sizeof(RunPair));
-            run_count--;
-            return;
-        }
-        if (merge_prev) {  // [a,num-1] + num
-            runs[pos].second++;
-            return;
-        }
-        if (merge_next) {  // num + [num+1, b]
-            runs[pos + 1].first--;
-            return;
-        }
-
-        if (run_count == capacity) {
-            expand();
-        }
-        if (run_count - pos > 2)
-            std::memmove(&runs[pos + 2], &runs[pos + 1],
-                         (run_count - pos - 2) * sizeof(RunPair));
-        run_count++;
-        runs[pos + 1] = {num, num};
-        return;
+        set_raw(pos, num);
     }
 
     void reset(DataType num) {
@@ -115,9 +85,17 @@ public:
     }
 
     bool test_and_set(DataType num) {
-        bool was_set = test(num);
+        bool was_set;
+        DataType pos;
+        if (!run_count) {
+            was_set = false;
+        } else {
+            pos = upper_bound(num);
+            was_set = (pos < run_count && runs[pos].first <= num &&
+                       num <= runs[pos].second);
+        }
         if (was_set) return false;
-        set(num);
+        set_raw(pos, num);
         return true;
     }
 
@@ -162,6 +140,40 @@ private:
         std::memmove(new_runs, runs, run_count * sizeof(RunPair));
         delete[] runs;
         runs = new_runs;
+    }
+
+    void set_raw(DataType pos, DataType num) {
+        // If the value is next to the previous run's end (and need merging)
+        bool merge_prev = (num > 0 && num - 1 == runs[pos].second);
+        // If the value is next to the next run's start (and need merging)
+        bool merge_next = (pos < run_count - 1 && runs[pos + 1].first > 0 &&
+                           runs[pos + 1].first - 1 == num);
+        if (merge_prev && merge_next) {  // [a,num-1] + num + [num+1, b]
+
+            runs[pos].second = runs[pos + 1].second;
+            std::memmove(&runs[pos + 1], &runs[pos + 2],
+                         (run_count - pos - 1) * sizeof(RunPair));
+            run_count--;
+            return;
+        }
+        if (merge_prev) {  // [a,num-1] + num
+            runs[pos].second++;
+            return;
+        }
+        if (merge_next) {  // num + [num+1, b]
+            runs[pos + 1].first--;
+            return;
+        }
+
+        if (run_count == capacity) {
+            expand();
+        }
+        if (run_count - pos > 2)
+            std::memmove(&runs[pos + 2], &runs[pos + 1],
+                         (run_count - pos - 2) * sizeof(RunPair));
+        run_count++;
+        runs[pos + 1] = {num, num};
+        return;
     }
 };
 }  // namespace froaring
