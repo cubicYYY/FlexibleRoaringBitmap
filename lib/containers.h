@@ -98,11 +98,9 @@ public:
         num2index_n_data<IndexBits, DataBits>(value, index, data);
 
         auto entry_it = getContainerPosByIndex(index);
-        if (entry_it == containers.end())
-            return false;
+        if (entry_it == containers.end()) return false;
         auto entry = *entry_it;
-        if (entry.containerIndex != index)
-            return false;
+        if (entry.containerIndex != index) return false;
 
         // Now we found the corresponding container
         switch (entry.containerType) {

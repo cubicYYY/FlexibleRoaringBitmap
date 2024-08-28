@@ -1,30 +1,22 @@
-# # Enable testing
-# enable_testing()
+# tests/CMakeLists.txt
 
-# # Add test executables
-# add_executable(test_containers test_containers.cpp)
-# add_executable(test_rlecontainer test_rlecontainer.cpp)
-# add_executable(test_arraycontainer test_arraycontainer.cpp)
-# add_executable(test_bitmapcontainer test_bitmapcontainer.cpp)
-# add_executable(test_flexibleroaringbitmap test_flexibleroaringbitmap.cpp)
+# 添加 Google Test
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR}/lib)
 
-# # Link the test executables with the library
-# target_link_libraries(test_containers FlexibleRoaringBitmap)
-# target_link_libraries(test_rlecontainer FlexibleRoaringBitmap)
-# target_link_libraries(test_arraycontainer FlexibleRoaringBitmap)
-# target_link_libraries(test_bitmapcontainer FlexibleRoaringBitmap)
-# target_link_libraries(test_flexibleroaringbitmap FlexibleRoaringBitmap)
+# 添加测试文件
+add_executable(ArrayContainerTest test_array_container.cpp)
+target_link_libraries(ArrayContainerTest ${GTEST_LIBRARIES} pthread)
+add_executable(BitmapContainerTest test_bitmap_container.cpp)
+target_link_libraries(BitmapContainerTest ${GTEST_LIBRARIES} pthread)
+add_executable(RLEContainerTest test_rle_container.cpp)
+target_link_libraries(RLEContainerTest ${GTEST_LIBRARIES} pthread)
 
-# # Include directories for the tests
-# target_include_directories(test_containers PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-# target_include_directories(test_rlecontainer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-# target_include_directories(test_arraycontainer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-# target_include_directories(test_bitmapcontainer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-# target_include_directories(test_flexibleroaringbitmap PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+# 启用测试
+enable_testing()
 
-# # Add tests to CTest
-# add_test(NAME test_containers COMMAND test_containers)
-# add_test(NAME test_rlecontainer COMMAND test_rlecontainer)
-# add_test(NAME test_arraycontainer COMMAND test_arraycontainer)
-# add_test(NAME test_bitmapcontainer COMMAND test_bitmapcontainer)
-# add_test(NAME test_flexibleroaringbitmap COMMAND test_flexibleroaringbitmap)
+# 添加测试
+add_test(NAME ArrayContainerTest COMMAND ArrayContainerTest)
+add_test(NAME BitmapContainerTest COMMAND BitmapContainerTest)
+add_test(NAME RLEContainerTest COMMAND RLEContainerTest)

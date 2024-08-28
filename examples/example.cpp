@@ -14,7 +14,12 @@ int main() {
     assert(a.test(101));
     assert(!a.test(99));
     assert(!a.test(102));
-    assert(a.cardinality() == 3);
+    assert(!a.test(102));
+    a.set(102);
+    assert(a.test(102));
+    // a.reset(102);
+    // assert(!a.test(102));
+    assert(a.cardinality() == 4);
 
     cout << sizeof(a) << endl;
 }

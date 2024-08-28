@@ -7,6 +7,8 @@
 namespace froaring {
 
 enum class ContainerType { Array, Bitmap, RLE, Containers };
+const int ARRAY_CONTAINER_INIT_SIZE = 4;
+const int RLE_CONTAINER_INIT_SIZE = 4;
 
 template <size_t Bits>
 struct can_fit {
