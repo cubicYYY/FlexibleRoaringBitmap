@@ -132,7 +132,8 @@ public:
             ContainerEntry newEntry;
             newEntry.containerIndex = index;
             newEntry.containerType = CTy::Array;
-            newEntry.containerPtr = new ArrayContainer<WordType, DataBits>();
+            newEntry.containerPtr =
+                ArrayContainer<WordType, DataBits>::create();
 
             containers.insert(it, newEntry);
             it = getContainerPosByIndex(index);
@@ -145,21 +146,26 @@ public:
 
         // Now we found the corresponding container
         switch (entry.containerType) {
-            case CTy::RLE:
-                static_cast<RLEContainer<WordType, DataBits>*>(
-                    entry.containerPtr)
-                    ->set(data);
+            case CTy::RLE: {
+                auto rleptr = static_cast<RLEContainer<WordType, DataBits>*>(
+                    entry.containerPtr);
+                RLEContainer<WordType, DataBits>::set(rleptr, data);
+                entry.containerPtr = (void*)rleptr;
                 break;
-            case CTy::Array:
-                static_cast<ArrayContainer<WordType, DataBits>*>(
-                    entry.containerPtr)
-                    ->set(data);
+            }
+            case CTy::Array: {
+                auto aptr = static_cast<ArrayContainer<WordType, DataBits>*>(
+                    entry.containerPtr);
+                ArrayContainer<WordType, DataBits>::set(aptr, data);
+                entry.containerPtr = (void*)aptr;
                 break;
-            case CTy::Bitmap:
+            }
+            case CTy::Bitmap: {
                 static_cast<BitmapContainer<WordType, DataBits>*>(
                     entry.containerPtr)
                     ->set(data);
                 break;
+            }
             default:
                 FROARING_UNREACHABLE
         }

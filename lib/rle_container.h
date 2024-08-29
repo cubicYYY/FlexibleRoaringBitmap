@@ -13,85 +13,89 @@
 namespace froaring {
 template <typename WordType, size_t DataBits>
 class RLEContainer {
-    using DataType = froaring::can_fit_t<DataBits>;
-    static constexpr DataType initial_capacity = RLE_CONTAINER_INIT_SIZE;
-    using RunPair = std::pair<DataType, DataType>;  // e.g., {5,10} stands for
+    using IndexOrNumType = froaring::can_fit_t<DataBits>;
+    using SizeType = froaring::can_fit_t<DataBits + 1>;
+    static constexpr SizeType initial_capacity = RLE_CONTAINER_INIT_SIZE;
+    using RunPair =
+        std::pair<IndexOrNumType, IndexOrNumType>;  // e.g., {5,10} stands for
                                                     // [5,6,7,8,9,10]
-    RunPair* runs;
-    size_t capacity;
-    DataType run_count;  // Always less than 2**(DataBits-1)
+    SizeType capacity;
+    IndexOrNumType size;  // Always less than 2**(DataBits-1)
+    RunPair runs[];
 
 public:
-    RLEContainer()
-        : runs(new RunPair[initial_capacity]),
-          capacity(initial_capacity),
-          run_count(0) {}
-
-    ~RLEContainer() { delete[] runs; }
-
     RLEContainer(const RLEContainer&) = delete;
     RLEContainer& operator=(const RLEContainer&) = delete;
 
-    void clear() { run_count = 0; }
+    static RLEContainer* create(SizeType capacity = RLE_CONTAINER_INIT_SIZE) {
+        size_t totalSize = sizeof(RLEContainer) + capacity * sizeof(RunPair);
+        void* memory = operator new(totalSize);
+        RLEContainer* container = new (memory) RLEContainer();
+        return container;
+    }
 
-    void set(DataType num) {
-        if (!run_count) {
-            assert(capacity > 0 && "???");
-            runs[0] = {num, num};
-            run_count = 1;
+    void clear() { size = 0; }
+
+    /// @brief Set a bit of the container. NOTE: `c` may be changed!
+    /// @param c Points to the container, may be changed if the container get
+    /// expanded.
+    /// @param num The bit to set.
+    static void set(RLEContainer*& c, IndexOrNumType num) {
+        if (!c->size) {
+            c->runs[0] = {num, num};
+            c->size = 1;
             return;
         }
-        auto pos = upper_bound(num);
-        if (pos < run_count && runs[pos].first <= num &&
-            num <= runs[pos].second) {
+        auto pos = c->upper_bound(num);
+        if (pos < c->size && c->runs[pos].first <= num &&
+            num <= c->runs[pos].second) {
             return;  // already set, do nothing.
         }
-        set_raw(pos, num);
+        set_raw(c, pos, num);
     }
 
-    void reset(DataType num) {
-        if (!run_count) return;
-        auto pos = upper_bound(num);
-        auto& run = runs[pos];
-        if (run.first > num || run.second < num) return;
+    static void reset(RLEContainer*& c, IndexOrNumType num) {
+        if (!c->size) return;
+        auto pos = c->upper_bound(num);
+        auto old_end = c->runs[pos].second;
+        if (c->runs[pos].first > num || c->runs[pos].second < num) return;
 
-        if (run.first == num &&
-            run.second == num) {  // run is a single element, just remove it
-            memmove(&runs[pos], &runs[pos + 1],
-                    (run_count - pos - 1) * sizeof(RunPair));
-            --run_count;
-        } else if (run.first == num) {
-            run.first++;
-        } else if (run.second == num) {
-            run.second--;
+        if (c->runs[pos].first == num &&
+            c->runs[pos].second ==
+                num) {  // run is a single element, just remove it
+            memmove(&c->runs[pos], &c->runs[pos + 1],
+                    (c->size - pos - 1) * sizeof(RunPair));
+            --c->size;
+        } else if (c->runs[pos].first == num) {
+            c->runs[pos].first++;
+        } else if (c->runs[pos].second == num) {
+            c->runs[pos].second--;
         } else {  // split the run [a,b] into: [a, num-1] and [num+1, b]
-            if (run_count == capacity) {
-                expand();
-            }
-            auto old_end = run.second;  // b
-            std::memmove(&runs[pos + 2], &runs[pos + 1],
-                         (run_count - pos - 1) * sizeof(RunPair));
-            run_count++;
-            runs[pos].second = num - 1;
-            runs[pos + 1] = {num + 1, old_end};
+            if (c->size == c->capacity) RLEContainer::expand(c);
+
+            std::memmove(&c->runs[pos + 2], &c->runs[pos + 1],
+                         (c->size - pos - 1) * sizeof(RunPair));
+            c->size++;
+            c->runs[pos].second = num - 1;
+            c->runs[pos + 1] = {num + 1, old_end};
         }
     }
 
-    bool test(DataType num) const {
-        if (!run_count) return false;
+    bool test(IndexOrNumType num) const {
+        if (!size) return false;
         auto pos = upper_bound(num);
-        return (pos < run_count && runs[pos].first <= num &&
+        return (pos < size && runs[pos].first <= num &&
                 num <= runs[pos].second);
     }
 
-    bool test_and_set(DataType num) {
+    bool test_and_set(IndexOrNumType num) {
         bool was_set;
-        DataType pos;
-        if (!run_count) {
+        IndexOrNumType pos;
+        if (!size) {
             was_set = false;
         } else {
             pos = upper_bound(num);
-            was_set = (pos < run_count && runs[pos].first <= num &&
+            was_set = (pos < size && runs[pos].first <= num &&
                        num <= runs[pos].second);
         }
         if (was_set) return false;
@@ -99,19 +103,19 @@ public:
         return true;
     }
 
-    size_t cardinality() const {
-        size_t count = 0;
-        for (DataType i = 0; i < run_count; ++i) {
+    SizeType cardinality() const {
+        SizeType count = 0;
+        for (IndexOrNumType i = 0; i < size; ++i) {
             count += runs[i].second - runs[i].first;
         }
         // We need to add 1 to the count because the range is inclusive
-        return count + run_count;
+        return count + size;
     }
 
-    DataType pairs() const { return run_count; }
+    IndexOrNumType pairs() const { return size; }
 
     void debug_print() const {
-        for (size_t i = 0; i < run_count; ++i) {
+        for (size_t i = 0; i < size; ++i) {
             std::cout << "[" << int(runs[i].first) << "," << int(runs[i].second)
                       << "] ";
         }
@@ -119,12 +123,15 @@ public:
     }
 
 private:
-    DataType upper_bound(DataType num) const {
-        assert(run_count && "Cannot find upper bound in an empty container");
-        DataType low = 0;
-        DataType high = run_count;
+    RLEContainer(SizeType capacity = RLE_CONTAINER_INIT_SIZE, SizeType size = 0)
+        : capacity(capacity), size(size) {}
+
+    SizeType upper_bound(IndexOrNumType num) const {
+        assert(size && "Cannot find upper bound in an empty container");
+        SizeType low = 0;
+        SizeType high = size;
         while (low < high) {
-            DataType mid = low + (high - low) / 2;
+            SizeType mid = low + (high - low) / 2;
             if (runs[mid].first <= num) {
                 low = mid + 1;
             } else {
@@ -134,45 +141,53 @@ private:
         return (low > 0) ? low - 1 : 0;
     }
 
-    void expand() {
-        capacity *= 2;
-        auto new_runs = new RunPair[capacity];
-        std::memmove(new_runs, runs, run_count * sizeof(RunPair));
-        delete[] runs;
-        runs = new_runs;
+    static void expand(RLEContainer*& c) {
+        auto new_cap = c->capacity * 2;
+
+        size_t totalSize = sizeof(RLEContainer) + new_cap * sizeof(RunPair);
+        void* new_memory = operator new(totalSize);
+        RLEContainer* new_container =
+            new (new_memory) RLEContainer(new_cap, c->size);
+
+        std::memmove(&new_container->runs, &c->runs, c->size * sizeof(RunPair));
+        c->~RLEContainer();
+        operator delete(c);
+
+        c = new_container;
     }
 
-    void set_raw(DataType pos, DataType num) {
+    static void set_raw(RLEContainer*& c, IndexOrNumType pos,
+                        IndexOrNumType num) {
         // If the value is next to the previous run's end (and need merging)
-        bool merge_prev = (num > 0 && num - 1 == runs[pos].second);
+        bool merge_prev = (num > 0 && num - 1 == c->runs[pos].second);
         // If the value is next to the next run's start (and need merging)
-        bool merge_next = (pos < run_count - 1 && runs[pos + 1].first > 0 &&
-                           runs[pos + 1].first - 1 == num);
+        bool merge_next = (pos < c->size - 1 && c->runs[pos + 1].first > 0 &&
+                           c->runs[pos + 1].first - 1 == num);
         if (merge_prev && merge_next) {  // [a,num-1] + num + [num+1, b]
 
-            runs[pos].second = runs[pos + 1].second;
-            std::memmove(&runs[pos + 1], &runs[pos + 2],
-                         (run_count - pos - 1) * sizeof(RunPair));
-            run_count--;
+            c->runs[pos].second = c->runs[pos + 1].second;
+            std::memmove(&c->runs[pos + 1], &c->runs[pos + 2],
+                         (c->size - pos - 1) * sizeof(RunPair));
+            c->size--;
             return;
         }
         if (merge_prev) {  // [a,num-1] + num
-            runs[pos].second++;
+            c->runs[pos].second++;
             return;
         }
         if (merge_next) {  // num + [num+1, b]
-            runs[pos + 1].first--;
+            c->runs[pos + 1].first--;
             return;
         }
 
-        if (run_count == capacity) {
-            expand();
+        if (c->size == c->capacity) {
+            expand(c);
         }
-        if (run_count - pos > 2)
-            std::memmove(&runs[pos + 2], &runs[pos + 1],
-                         (run_count - pos - 2) * sizeof(RunPair));
-        run_count++;
-        runs[pos + 1] = {num, num};
+        if (c->size - pos > 2)
+            std::memmove(&c->runs[pos + 2], &c->runs[pos + 1],
+                         (c->size - pos - 2) * sizeof(RunPair));
+        c->size++;
+        c->runs[pos + 1] = {num, num};
         return;
     }
 };

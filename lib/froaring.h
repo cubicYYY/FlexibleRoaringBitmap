@@ -20,15 +20,17 @@ template <typename WordType = uint64_t, size_t IndexBits = 16,
           size_t DataBits = 8>
 class FlexibleRoaringBitmap {
     using IndexType = froaring::can_fit_t<IndexBits>;
-
+    using RLESized = RLEContainer<WordType, DataBits>;
+    using BitmapSized = BitmapContainer<WordType, DataBits>;
+    using ArraySized = ArrayContainer<WordType, DataBits>;
     IndexType start_index = 0;  // The index of the container. This is only used
                                 // if the bitmap is storing a single container.
     ContainerType type;
     union {
         // If only a single container is needed, we can store it directly.
-        RLEContainer<WordType, DataBits> rleContainer;
-        ArrayContainer<WordType, DataBits> arrayContainer;
-        BitmapContainer<WordType, DataBits> bitmapContainer;
+        RLESized* rleContainer;
+        ArraySized* arrayContainer;
+        BitmapSized* bitmapContainer;
         // Otherwise, the bit map is of containers.
         Containers<WordType, IndexBits, DataBits> containers;
     };
@@ -37,7 +39,7 @@ class FlexibleRoaringBitmap {
 public:
     /// We start from an array container.
     FlexibleRoaringBitmap() : type(CTy::Array) {
-        new (&arrayContainer) ArrayContainer<WordType, DataBits>();
+        arrayContainer = ArraySized::create();
     }
 
     ~FlexibleRoaringBitmap() { destroyCurrentContainer(); }
@@ -45,20 +47,20 @@ public:
     void set(WordType index) {
         switch (type) {
             case CTy::RLE:
-                rleContainer.set(index);
-                if (arrayContainer.cardinality() > DataBits) {
+                RLESized::set(rleContainer, index);
+                if (rleContainer->cardinality() > DataBits) {
                     switchToContainers();
                 }
                 break;
             case CTy::Array:
-                arrayContainer.set(index);
-                if (arrayContainer.cardinality() > DataBits) {
+                ArraySized::set(arrayContainer, index);
+                if (arrayContainer->cardinality() > DataBits) {
                     switchToContainers();
                 }
                 break;
             case CTy::Bitmap:
-                bitmapContainer.set(index);
-                if (arrayContainer.cardinality() > DataBits) {
+                bitmapContainer->set(index);
+                if (bitmapContainer->cardinality() > DataBits) {
                     switchToContainers();
                 }
                 break;
@@ -73,11 +75,11 @@ public:
     bool test(WordType index) const {
         switch (type) {
             case CTy::RLE:
-                return rleContainer.test(index);
+                return rleContainer->test(index);
             case CTy::Array:
-                return arrayContainer.test(index);
+                return arrayContainer->test(index);
             case CTy::Bitmap:
-                return bitmapContainer.test(index);
+                return bitmapContainer->test(index);
             case CTy::Containers:
                 return containers.test(index);
             default:
@@ -90,11 +92,11 @@ public:
     size_t cardinality() const {
         switch (type) {
             case CTy::RLE:
-                return rleContainer.cardinality();
+                return rleContainer->cardinality();
             case CTy::Array:
-                return arrayContainer.cardinality();
+                return arrayContainer->cardinality();
             case CTy::Bitmap:
-                return bitmapContainer.cardinality();
+                return bitmapContainer->cardinality();
             case CTy::Containers:
                 return containers.cardinality();
             default:
@@ -107,13 +109,13 @@ private:
     void destroyCurrentContainer() {
         switch (type) {
             case CTy::RLE:
-                rleContainer.~RLEContainer();
+                rleContainer->~RLEContainer();
                 break;
             case CTy::Array:
-                arrayContainer.~ArrayContainer();
+                arrayContainer->~ArrayContainer();
                 break;
             case CTy::Bitmap:
-                bitmapContainer.~BitmapContainer();
+                bitmapContainer->~BitmapContainer();
                 break;
             case CTy::Containers:
                 containers.~Containers();
@@ -131,11 +133,7 @@ private:
             type == CTy::Array &&
             "Only array can switch to containers (otherwise not implemented)");
         Containers<WordType, IndexBits, DataBits> newContainers;
-        // TODO: newContainers.add(arrayContainer);
-        destroyCurrentContainer();
-        new (&containers)
-            Containers<WordType, IndexBits, DataBits>(std::move(newContainers));
-        type = CTy::Containers;
+        // TODO: ...
     }
 };
 }  // namespace froaring
