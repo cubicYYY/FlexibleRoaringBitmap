@@ -10,27 +10,27 @@ protected:
     ArrayContainerSized* container;
 
     void SetUp() override {
-        container = ArrayContainerSized::create();
+        container = new ArrayContainerSized();
         container->clear();
-        ArrayContainerSized::set(container, 1);
-        ArrayContainerSized::set(container, 2);
-        ArrayContainerSized::set(container, 3);
+        container->set(1);
+        container->set(2);
+        container->set(3);
     }
 };
 
 TEST_F(ArrayContainerTest, SetBoundaryTest) {
-    ArrayContainerSized::set(container, 0);
+    container->set(0);
     EXPECT_TRUE(container->test(0));
     EXPECT_EQ(container->cardinality(), 4);
 
-    ArrayContainerSized::set(container, 255);
+    container->set(255);
     EXPECT_TRUE(container->test(255));
     EXPECT_EQ(container->cardinality(), 5);
 }
 
 TEST_F(ArrayContainerTest, ResetBoundaryTest) {
-    ArrayContainerSized::set(container, 0);
-    ArrayContainerSized::set(container, 255);
+    container->set(0);
+    container->set(255);
 
     container->reset(0);
     EXPECT_FALSE(container->test(0));
@@ -42,8 +42,8 @@ TEST_F(ArrayContainerTest, ResetBoundaryTest) {
 }
 
 TEST_F(ArrayContainerTest, TestBoundaryTest) {
-    ArrayContainerSized::set(container, 0);
-    ArrayContainerSized::set(container, 255);
+    container->set(0);
+    container->set(255);
 
     EXPECT_TRUE(container->test(0));
     EXPECT_TRUE(255);
@@ -52,18 +52,18 @@ TEST_F(ArrayContainerTest, TestBoundaryTest) {
 
 TEST_F(ArrayContainerTest, ExpandBoundaryTest) {
     for (uint64_t i = 4; i <= 10; ++i) {
-        ArrayContainerSized::set(container, i);
+        container->set(i);
     }
     EXPECT_EQ(container->cardinality(), 10);
     EXPECT_TRUE(container->test(10));
 
-    ArrayContainerSized::set(container, 255);
+    container->set(255);
     EXPECT_EQ(container->cardinality(), 11);
 }
 
 TEST_F(ArrayContainerTest, ExpansionTest) {
     for (uint64_t i = 0; i <= 255; ++i) {
-        ArrayContainerSized::set(container, i);
+        container->set(i);
     }
     container->debug_print();
     EXPECT_EQ(container->cardinality(), 256);

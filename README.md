@@ -1,16 +1,36 @@
 # Flexible Roaring Bitmap
 
-*Flexible Roaring Bitmap* is a variation of [Roaring Bitmap](), with a flexible interface based on templates.
+**Work in Progress.**
+
+*Flexible Roaring Bitmap* is a variation of [Roaring Bitmap](https://github.com/RoaringBitmap/CRoaring), with a flexible interface based on templates.
 
 You can custom the index size, the container size and the underlying word size.
 
-It is optimized for small containers: if only a single container is needed, no arrays will be used.
+## Components
+
+### Flexible Roaring Bitmap
+
+Out-of-the-box bitmap for handling sparse bit maps.
+
+- Minimizes memory usage.
+- Structure: `BinSearchIndex -> Containers`, or `Single container` for small ones.
+
+### Containers
+
+- Bitmap: use bits to represent 0 & 1.
+- Array: number indices.
+- RLE: Run-Length Encoded array
+
+### Index Layer
+
+- BinSearchIndex
+- RBTreeIndex (TODO)
 
 ## Usage
 
 ```bash
 # Clone the repository
-git clone ...
+git clone https://github.com/cubicYYY/FlexibleRoaringBitmap.git
 cd ./FlexibleRoaringBitmap
 
 # Build examples
@@ -24,5 +44,3 @@ make -j
 ./example
 # ...
 ```
-
-**Work in Progress.**

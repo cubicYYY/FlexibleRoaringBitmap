@@ -7,9 +7,7 @@ class BitmapContainerTest : public ::testing::Test {
 protected:
     BitmapContainer<uint64_t, 8>* container;
 
-    void SetUp() override {
-        container = BitmapContainer<uint64_t, 8>::create();
-    }
+    void SetUp() override { container = new BitmapContainer<uint64_t, 8>(); }
 };
 
 TEST_F(BitmapContainerTest, TestSetAndTest) {
@@ -32,7 +30,7 @@ TEST_F(BitmapContainerTest, TestCardinality) {
     container->set(12);
     container->set(255);
     container->set(254);
-
+    container->debug_print();
     EXPECT_EQ(container->cardinality(), 6);
     container->reset(11);
     EXPECT_EQ(container->cardinality(), 5);

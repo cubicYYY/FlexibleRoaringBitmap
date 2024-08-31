@@ -7,21 +7,21 @@ namespace froaring {
 class RLEContainerTest : public ::testing::Test {
 protected:
     using RLESized = RLEContainer<uint64_t, 8>;
-    RLEContainer<uint64_t, 8>* container;
+    RLESized* container;
 
-    void SetUp() override { container = RLEContainer<uint64_t, 8>::create(); }
+    void SetUp() override { container = new RLESized(); }
 };
 
 TEST_F(RLEContainerTest, SetSingleValue) {
-    RLESized::set(container, 5);
+    container->set(5);
     EXPECT_TRUE(container->test(5));
     EXPECT_EQ(container->cardinality(), 1);
 }
 
 TEST_F(RLEContainerTest, SetMultipleValues) {
-    RLESized::set(container, 5);
-    RLESized::set(container, 10);
-    RLESized::set(container, 15);
+    container->set(5);
+    container->set(10);
+    container->set(15);
     EXPECT_TRUE(container->test(5));
     EXPECT_TRUE(container->test(10));
     EXPECT_TRUE(container->test(15));
@@ -29,9 +29,9 @@ TEST_F(RLEContainerTest, SetMultipleValues) {
 }
 
 TEST_F(RLEContainerTest, SetAndMergeRuns) {
-    RLESized::set(container, 5);
-    RLESized::set(container, 6);
-    RLESized::set(container, 7);
+    container->set(5);
+    container->set(6);
+    container->set(7);
     EXPECT_TRUE(container->test(5));
     EXPECT_TRUE(container->test(6));
     EXPECT_TRUE(container->test(7));
@@ -39,30 +39,30 @@ TEST_F(RLEContainerTest, SetAndMergeRuns) {
 }
 
 TEST_F(RLEContainerTest, ResetSingleValue) {
-    RLESized::set(container, 5);
-    RLESized::reset(container, 5);
+    container->set(5);
+    container->reset(5);
     EXPECT_FALSE(container->test(5));
     EXPECT_EQ(container->cardinality(), 0);
 }
 
 TEST_F(RLEContainerTest, ResetValueInRun) {
-    RLESized::set(container, 5);
-    RLESized::set(container, 6);
-    RLESized::set(container, 7);
-    RLESized::set(container, 7);
-    RLESized::set(container, 8);
-    RLESized::set(container, 9);
+    container->set(5);
+    container->set(6);
+    container->set(7);
+    container->set(7);
+    container->set(8);
+    container->set(9);
 
-    RLESized::set(container, 255);
-    RLESized::set(container, 254);
-    RLESized::set(container, 253);
-    RLESized::set(container, 252);
-    RLESized::set(container, 251);
+    container->set(255);
+    container->set(254);
+    container->set(253);
+    container->set(252);
+    container->set(251);
 
-    RLESized::reset(container, 7);
-    RLESized::reset(container, 253);
+    container->reset(7);
+    container->reset(253);
 
-    EXPECT_EQ(container->pairs(), 4);
+    EXPECT_EQ(container->runsCount(), 4);
     EXPECT_TRUE(container->test(5));
     EXPECT_TRUE(container->test(6));
     EXPECT_FALSE(container->test(7));
@@ -70,10 +70,10 @@ TEST_F(RLEContainerTest, ResetValueInRun) {
 }
 
 TEST_F(RLEContainerTest, ResetAndSplitRun) {
-    RLESized::set(container, 5);
-    RLESized::set(container, 6);
-    RLESized::set(container, 7);
-    RLESized::reset(container, 6);
+    container->set(5);
+    container->set(6);
+    container->set(7);
+    container->reset(6);
     EXPECT_TRUE(container->test(5));
     EXPECT_FALSE(container->test(6));
     EXPECT_TRUE(container->test(7));
@@ -82,15 +82,15 @@ TEST_F(RLEContainerTest, ResetAndSplitRun) {
 
 TEST_F(RLEContainerTest, AlternativelySetTest) {
     for (size_t i = 0; i < 256; i += 2) {
-        RLESized::set(container, i);
+        container->set(i);
     }
     EXPECT_EQ(container->cardinality(), 128);
-    EXPECT_EQ(container->pairs(), 128);
+    EXPECT_EQ(container->runsCount(), 128);
     for (size_t i = 1; i < 256; i += 2) {
-        RLESized::set(container, i);
+        container->set(i);
     }
     EXPECT_EQ(container->cardinality(), 256);
-    EXPECT_EQ(container->pairs(), 1);
+    EXPECT_EQ(container->runsCount(), 1);
 }
 
 }  // namespace froaring

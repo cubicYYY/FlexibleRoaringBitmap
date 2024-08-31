@@ -4,7 +4,7 @@ IndentWidth: 4
 TabWidth: 4
 UseTab: Never
 BreakBeforeBraces: Attach
-ColumnLimit: 80
+ColumnLimit: 120
 ContinuationIndentWidth: 4
 IndentCaseLabels: true
 AccessModifierOffset: -4

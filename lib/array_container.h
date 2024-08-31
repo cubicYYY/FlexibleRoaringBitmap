@@ -10,7 +10,8 @@
 // FIXME: check all the memmove-s!
 namespace froaring {
 template <typename WordType, size_t DataBits>
-class ArrayContainer {
+class ArrayContainer : public froaring_container_t {
+public:
     using IndexOrNumType = froaring::can_fit_t<DataBits>;
     using SizeType = froaring::can_fit_t<DataBits + 1>;
 
@@ -21,33 +22,33 @@ public:
         }
         std::cout << std::endl;
     }
-    static ArrayContainer* create(
-        SizeType capacity = ARRAY_CONTAINER_INIT_SIZE) {
-        size_t totalSize =
-            sizeof(ArrayContainer) + capacity * sizeof(IndexOrNumType);
-        void* memory = operator new(totalSize);
-        ArrayContainer* container = new (memory) ArrayContainer();
-        return container;
+
+    ArrayContainer(SizeType capacity = ARRAY_CONTAINER_INIT_CAPACITY, SizeType size = 0)
+        : capacity(capacity),
+          size(size),
+          vals(static_cast<IndexOrNumType*>(malloc(capacity * sizeof(IndexOrNumType)))) {
+        assert(vals && "Failed to allocate memory for ArrayContainer");
     }
+
+    ~ArrayContainer() { free(vals); }
 
     ArrayContainer(const ArrayContainer&) = delete;
     ArrayContainer& operator=(const ArrayContainer&) = delete;
 
     void clear() { size = 0; }
 
-    static void set(ArrayContainer*& c, IndexOrNumType num) {
-        auto pos = (c->size ? c->lower_bound(num) : 0);
-        if (pos < c->size && c->vals[pos] == num) return;
+    void set(IndexOrNumType num) {
+        auto pos = (size ? lower_bound(num) : 0);
+        if (pos < size && vals[pos] == num) return;
 
-        if (c->size == c->capacity) expand(c);
+        if (size == capacity) expand();
 
-        std::memmove(&c->vals[pos + 1], &c->vals[pos],
-                     (c->size - pos) *
-                         sizeof(IndexOrNumType));  // TODO: Boost by combining
-                                                   // memmove with expand()
+        std::memmove(&vals[pos + 1], &vals[pos],
+                     (size - pos) * sizeof(IndexOrNumType));  // TODO: Boost by combining
+                                                              // memmove with expand()
 
-        c->vals[pos] = num;
-        ++c->size;
+        vals[pos] = num;
+        ++size;
     }
 
     void reset(IndexOrNumType num) {
@@ -55,38 +56,34 @@ public:
         auto pos = lower_bound(num);
         if (pos == size || vals[pos] != num) return;
 
-        std::memmove(&vals[pos], &vals[pos + 1],
-                     (size - pos - 1) * sizeof(IndexOrNumType));
+        std::memmove(&vals[pos], &vals[pos + 1], (size - pos - 1) * sizeof(IndexOrNumType));
         --size;
     }
 
     bool test(IndexOrNumType num) const {
         if (!size) return false;
         auto pos = lower_bound(num);
-        std::cout << "pos=" << int(pos) << " v[p]=" << int(vals[pos])
-                  << std::endl;
         return pos < size && vals[pos] == num;
     }
 
-    static bool test_and_set(ArrayContainer*& c, IndexOrNumType num) {
+    bool test_and_set(IndexOrNumType num) {
         bool was_set;
         IndexOrNumType pos;
-        if (!c->size) {
+        if (!size) {
             was_set = false;
         } else {
-            pos = c->lower_bound(num);
-            was_set = (pos < c->size && c->vals[pos] == num);
+            pos = lower_bound(num);
+            was_set = (pos < size && vals[pos] == num);
         }
 
         if (was_set) return false;
 
-        if (c->size == c->capacity) expand(c);
+        if (size == capacity) expand();
 
-        std::memmove(&c->vals[pos + 1], &c->vals[pos],
-                     (c->size - pos) * sizeof(IndexOrNumType));
+        std::memmove(&vals[pos + 1], &vals[pos], (size - pos) * sizeof(IndexOrNumType));
 
-        c->vals[pos] = num;
-        ++c->size;
+        vals[pos] = num;
+        ++size;
 
         return true;
     }
@@ -94,21 +91,11 @@ public:
     SizeType cardinality() const { return size; }
 
 private:
-    static void expand(ArrayContainer*& c) {
-        auto new_cap = c->capacity * 2;
-
-        size_t totalSize =
-            sizeof(ArrayContainer) + new_cap * sizeof(IndexOrNumType);
-        void* new_memory = operator new(totalSize);
-        ArrayContainer* new_container =
-            new (new_memory) ArrayContainer(new_cap, c->size);
-
-        std::memmove(&new_container->vals, &c->vals,
-                     c->size * sizeof(IndexOrNumType));
-        c->~ArrayContainer();
-        operator delete(c);
-
-        c = new_container;
+    void expand() {
+        capacity *= 2;
+        void* new_memory = realloc(vals, capacity * sizeof(IndexOrNumType));
+        assert(new_memory && "Failed to reallocate memory for ArrayContainer");
+        vals = static_cast<IndexOrNumType*>(new_memory);
     }
 
     IndexOrNumType lower_bound(IndexOrNumType num) const {
@@ -126,12 +113,9 @@ private:
         return left;
     }
 
-    ArrayContainer(SizeType capacity = ARRAY_CONTAINER_INIT_SIZE,
-                   SizeType size = 0)
-        : capacity(capacity), size(size) {}
-
+public:
     SizeType capacity;
     SizeType size;
-    IndexOrNumType vals[];
+    IndexOrNumType* vals;
 };
 }  // namespace froaring
