@@ -11,6 +11,8 @@
 #include "bitmap_container.h"
 #include "prelude.h"
 #include "rle_container.h"
+#include "utils.h"
+#include "api.h"
 
 namespace froaring {
 /// @brief A flexible Roaring bitmap consists with a binary-search-indexed
@@ -23,14 +25,6 @@ namespace froaring {
 /// @tparam DataBits low bits to be stored in containers.
 template <typename WordType = uint64_t, size_t IndexBits = 16, size_t DataBits = 8>
 class FlexibleRoaringBitmap {
-    /// Bit capacity for containers indexed
-    static constexpr size_t ContainerCapacity = (1 << DataBits);
-    /// Array threshold (Array will not be optimum for storing more
-    /// elements)
-    static constexpr size_t ArrayToBitmapCountThreshold = ContainerCapacity / DataBits;
-    /// RLE threshold (RLE will not be optimum for more runs)
-    static constexpr size_t RleToBitmapRunThreshold = ContainerCapacity / (DataBits * 2);
-
     /// The container type for the index layer. Editable.
     // TODO: Support more index layers with maybe different types (maybe by Curiously Recurring Template Pattern)
     using ContainersSized = BinsearchIndex<WordType, IndexBits, DataBits>;
@@ -69,7 +63,32 @@ public:
                 FROARING_UNREACHABLE
         }
     }
+
+    void debug_print() {
+        switch (handle.type) {
+            case CTy::Array:
+                CAST_TO_ARRAY(handle.ptr)->debug_print();
+                break;
+            case CTy::Bitmap:
+                CAST_TO_BITMAP(handle.ptr)->debug_print();
+                break;
+            case CTy::RLE:
+                CAST_TO_RLE(handle.ptr)->debug_print();
+                break;
+            case CTy::Containers:
+                castToContainers(handle.ptr)->debug_print();
+                break;
+            default:
+                FROARING_UNREACHABLE
+        }
+    }
+
     void set(WordType num) {
+        if (handle.type == CTy::Containers) {
+            castToContainers(handle.ptr)->set(num);
+            return;
+        }
+
         can_fit_t<IndexBits> index;
         can_fit_t<DataBits> data;
         num2index_n_data<IndexBits, DataBits>(num, index, data);
@@ -81,11 +100,12 @@ public:
             CAST_TO_ARRAY(handle.ptr)->set(data);
             return;
         }
-        if (handle.type != CTy::Containers && handle.index != index) {  // Single container, and is set:
+        if (handle.index != index) {  // Single container, and is set:
             switchToContainers();
             castToContainers(handle.ptr)->set(num);
             return;
         }
+
         switch (handle.type) {
             case CTy::Array:
                 CAST_TO_ARRAY(handle.ptr)->set(data);
@@ -95,9 +115,6 @@ public:
                 break;
             case CTy::RLE:
                 CAST_TO_RLE(handle.ptr)->set(data);
-                break;
-            case CTy::Containers:
-                castToContainers(handle.ptr)->set(num);
                 break;
             default:
                 FROARING_UNREACHABLE
@@ -109,11 +126,15 @@ public:
             return false;
         }
 
+        if (handle.type == CTy::Containers) {
+            return castToContainers(handle.ptr)->test(num);
+        }
+
         can_fit_t<IndexBits> index;
         can_fit_t<DataBits> data;
         num2index_n_data<IndexBits, DataBits>(num, index, data);
 
-        if (handle.type != CTy::Containers && handle.index != index) {  // Single container, and is set:
+        if (handle.index != index) {  // Single container, and is set:
             return false;
         }
         switch (handle.type) {
@@ -136,11 +157,15 @@ public:
         if (!was_set()) {
             return;
         }
+        if (handle.type == CTy::Containers) {
+            castToContainers(handle.ptr)->reset(num);
+            return;
+        }
         can_fit_t<IndexBits> index;
         can_fit_t<DataBits> data;
         num2index_n_data<IndexBits, DataBits>(num, index, data);
 
-        if (handle.type != CTy::Containers && handle.index != index) {  // Single container, and is set:
+        if (handle.index != index) {  // Single container, and is set:
             return;
         }
 
@@ -183,8 +208,23 @@ public:
     }
 
     bool operator==(const FlexibleRoaringBitmap& other) const {
-        // TODO:
-        return true;
+        if (!was_set()) {
+            return (other.count() == 0);
+        }
+        if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
+            return froaring_equal_bsbs(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
+        }
+        if (handle.type == CTy::Containers) { // the other is not containers
+            const ContainerHandle& lhs = castToContainers(handle.ptr)->containers[0];
+            const ContainerHandle& rhs = other.handle;
+            return froaring_equal<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type);
+        }
+        if (other.handle.type == CTy::Containers) { // other is not containers
+            const ContainerHandle& lhs = castToContainers(other.handle.ptr)->containers[0];
+            const ContainerHandle& rhs = other.handle;
+            return froaring_equal<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type);
+        }
+        return froaring_equal<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type, other.handle.type);
     }
 
     /// @brief Called when the current container exceeds the block size:
@@ -195,16 +235,18 @@ public:
         ContainersSized* containers = new ContainersSized(CONTAINERS_INIT_CAPACITY, 1);
         // TODO: do not modify the containers directly
         containers->containers[0] = std::move(handle);
-
         handle = ContainerHandle(containers, CTy::Containers, -1);
     }
 
     bool was_set() const { return flag & WAS_SET; }
 
 private:
-    inline ContainersSized* castToContainers(froaring_container_t* p) { return static_cast<ContainersSized*>(p); }
+    ContainersSized* castToContainers(froaring_container_t* p) { return static_cast<ContainersSized*>(p); }
+    froaring_container_t* castToFroaring(ContainersSized* p) { return static_cast<froaring_container_t*>(p); }
+    const ContainersSized* castToContainers(const froaring_container_t* p) { return static_cast<const ContainersSized*>(p); }
+    const froaring_container_t* castToFroaring(const ContainersSized* p) { return static_cast<const froaring_container_t*>(p); }
 
-    inline const ContainersSized* castToContainers(const froaring_container_t* p) const {
+    const ContainersSized* castToContainers(const froaring_container_t* p) const {
         return static_cast<const ContainersSized*>(p);
     }
 

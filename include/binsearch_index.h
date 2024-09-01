@@ -1,7 +1,8 @@
 #pragma once
 
-#include "froaring_api/equal.h"
 #include "handle.h"
+#include "utils.h"
+#include "transform.h"
 
 namespace froaring {
 
@@ -28,6 +29,13 @@ public:
     using CTy = froaring::ContainerType;
     using ContainerHandle = froaring::ContainerHandle<IndexType>;
 
+    /// Bit capacity for containers indexed
+    static constexpr size_t ContainerCapacity = (1 << DataBits);
+    /// Array threshold (Array will not be optimum for storing more
+    /// elements)
+    static constexpr size_t ArrayToBitmapCountThreshold = ContainerCapacity / DataBits;
+    /// RLE threshold (RLE will not be optimum for more runs)
+    static constexpr size_t RleToBitmapRunThreshold = ContainerCapacity / (DataBits * 2);
 public:
 
     BinsearchIndex(SizeType capacity = CONTAINERS_INIT_CAPACITY, SizeType size = 0)
@@ -37,10 +45,29 @@ public:
         assert(containers && "Failed to allocate memory for containers");
     }
 
+    void debug_print() const {
+        for (SizeType i = 0; i < size; ++i) {
+            std::cout << "Index: " << containers[i].index << " Type: " << static_cast<int>(containers[i].type) << std::endl;
+            switch (containers[i].type) {
+                case CTy::RLE:
+                    CAST_TO_RLE(containers[i].ptr)->debug_print();
+                    break;
+                case CTy::Array:
+                    CAST_TO_ARRAY(containers[i].ptr)->debug_print();
+                    break;
+                case CTy::Bitmap:
+                    CAST_TO_BITMAP(containers[i].ptr)->debug_print();
+                    break;
+                default:
+                    FROARING_UNREACHABLE
+            }
+        }
+    }
+
     /// Return the entry position if found, otherwise the iterator points to the
     /// lower bound (to be inserted at).
     ///
-    SizeType getContainerPosByIndex(IndexType index) const {
+    SizeType lower_bound(IndexType index) const {
         SizeType left = 0;
         SizeType right = size;
 
@@ -72,10 +99,9 @@ public:
         can_fit_t<DataBits> data;
         num2index_n_data<IndexBits, DataBits>(value, index, data);
 
-        SizeType entry_pos = getContainerPosByIndex(index);
+        SizeType entry_pos = lower_bound(index);
 
-        if (entry_pos == size) return false;
-        if (containers[entry_pos].index != index) return false;
+        if (entry_pos == size || containers[entry_pos].index != index) return false;
 
         // Now we found the corresponding container
         switch (containers[entry_pos].type) {
@@ -97,50 +123,41 @@ public:
         can_fit_t<DataBits> data;
         num2index_n_data<IndexBits, DataBits>(value, index, data);
 
-        SizeType pos = getContainerPosByIndex(index);
+        SizeType pos = lower_bound(index);
 
-        // Not found, insert a new container at the end:
-        if (pos == size) {
+        // Not found, insert a new container:
+        if (pos == size || containers[pos].index != index) {
             if (size == capacity) {
                 expand();
             }
-
+            std::memmove(&containers[pos + 1], &containers[pos], (size - pos) * sizeof(ContainerHandle));
             auto array_ptr = new ArraySized(ARRAY_CONTAINER_INIT_CAPACITY, 1);
             array_ptr->vals[0] = data;
-            containers[size] = ContainerHandle(array_ptr, CTy::Array, index);
+            containers[pos] = ContainerHandle(array_ptr, CTy::Array, index);
             size++;
             return;
         }
-
-        // Not found, insert a new container in the middle:
-        if (pos < size && containers[pos].index != index) {
-            if (size == capacity) {
-                expand();
-            }
-
-            std::memmove(&containers[pos + 2], &containers[pos + 1], (size - pos - 1) * sizeof(ContainerHandle));
-            auto array_ptr = new ArraySized(ARRAY_CONTAINER_INIT_CAPACITY, 1);
-            array_ptr->vals[0] = data;
-            containers[pos + 1] = ContainerHandle(array_ptr, CTy::Array, index);
-            size++;
-            return;
-        }
-
-        ContainerHandle& entry = containers[pos];
-        assert(entry.index == index && "??? Wrong container found or created");
 
         // Now we found the corresponding container
-        switch (entry.type) {
+        switch (containers[pos].type) {
             case CTy::RLE: {
-                CAST_TO_RLE(entry.ptr)->set(data);
+                CAST_TO_RLE(containers[pos].ptr)->set(data);
                 break;
             }
             case CTy::Array: {
-                CAST_TO_ARRAY(entry.ptr)->set(data);
+                auto array_ptr = CAST_TO_ARRAY(containers[pos].ptr);
+               array_ptr->set(data);
+                // Transform into a bitmap container if it gets bigger
+                if (array_ptr->size >= ArrayToBitmapCountThreshold) {
+                    auto new_bitmap = froaring_array_to_bitmap<WordType, DataBits>(array_ptr);
+                    delete containers[pos].ptr;
+                    containers[pos].ptr = new_bitmap;
+                    containers[pos].type = CTy::Bitmap;
+                }
                 break;
             }
             case CTy::Bitmap: {
-                CAST_TO_BITMAP(entry.ptr)->set(data);
+                CAST_TO_BITMAP(containers[pos].ptr)->set(data);
                 break;
             }
             default:
@@ -175,7 +192,7 @@ public:
         can_fit_t<DataBits> data;
         num2index_n_data<IndexBits, DataBits>(value, index, data);
 
-        SizeType pos = getContainerPosByIndex(index);
+        SizeType pos = lower_bound(index);
         if (pos == size || containers[pos].index != index) {  // not found: return directly
             return;
         }
@@ -187,7 +204,7 @@ public:
         switch (entry.type) {
             case CTy::RLE: {
                 CAST_TO_RLE(entry.ptr)->reset(data);
-                if (CAST_TO_RLE(entry.ptr)->size == 0) {
+                if (CAST_TO_RLE(entry.ptr)->run_count == 0) {
                     delete entry.ptr;
                     if (size > 1) {
                         std::memmove(&containers[pos], &containers[pos + 1],
@@ -224,21 +241,6 @@ public:
             default:
                 FROARING_UNREACHABLE
         }
-    }
-
-    bool operator==(const BinsearchIndex& other) const {
-        if (size != other.size) return false;
-        for (SizeType i = 0; i < size; ++i) {  // quick check
-            if (containers[i].index != other.containers[i].index) {
-                return false;
-            }
-        }
-        for (SizeType i = 0; i < size; ++i) {
-            auto res = froaring_equal(containers[i].ptr, other.containers[i].ptr, containers[i].type,
-                                      other.containers[i].type);
-            if (!res) return false;
-        }
-        return true;
     }
 
 

@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <cassert>
+#include <new>
 
 #define WAS_SET 0x1
 #define FROARING_UNREACHABLE assert(false && "Should never reach here");
@@ -73,6 +74,14 @@ void num2index_n_data(can_fit_t<IndexBits + DataBits> value, can_fit_t<IndexBits
                                                       // needed
     data = value & ((can_fit_t<IndexBits + DataBits>(1) << DataBits) - 1);
     index = value >> DataBits;
+}
+
+/// @brief Get log2(x) floored at compile time.
+/// @example cexpr_log2(8) = 3, cexpr_log2(9) = 3, cexpr_log2(16) = 4
+template <typename T>
+constexpr T cexpr_log2(T x)
+{
+    return x == 1 ? 0 : 1+cexpr_log2(x >> 1);
 }
 
 }  // namespace froaring

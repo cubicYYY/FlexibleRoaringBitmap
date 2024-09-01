@@ -33,6 +33,21 @@ int main() {
 
     cout << a.count() << endl;
     assert(a.count() == 4);
+    assert(a == a);
+
+    froaring::FlexibleRoaringBitmap<> x, y;
+    x.set(1);
+    x.set(2);
+    x.set(3);
+    x.set(114514);
+    x.set(1919810);
+    x.reset(2);
+    y.set(1);
+    y.set(3);
+    y.set(114514);
+    y.set(1919810);
+    assert(x == y);
+
     cout << (a == a) << endl;
     cout << sizeof(a) << endl;
     cout << sizeof(std::vector<int>) << endl;

@@ -15,6 +15,7 @@ struct ContainerHandle {
     IndexType index = 0;  // Index for this container
 public:
     ContainerHandle() = default;
+    ContainerHandle(ContainerHandle&&) = default;
     ContainerHandle& operator=(ContainerHandle&&) = default;
 
     ContainerHandle(const ContainerHandle&) = delete;

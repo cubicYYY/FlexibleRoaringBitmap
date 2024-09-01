@@ -36,10 +36,24 @@ TEST(FlexibleRoaringBitmapTest, TypeConversion) {
 
     for (auto i = 0; i < 1000; i++) {
         bitmap.set(i);
-        bitmap.set(i+4090);
+        bitmap.set(i + 4090);
     }
-    
+    bitmap.debug_print();
     EXPECT_EQ(bitmap.count(), 2000);
+
+    for (auto i = 0; i < 1000; i++) {
+        bitmap.set(i);
+        bitmap.set(i + 4090);
+    }
+
+    EXPECT_EQ(bitmap.count(), 2000);
+
+    for (auto i = 0; i < 1000; i++) {
+        bitmap.reset(i);
+        bitmap.reset(i + 4090);
+    }
+
+    EXPECT_EQ(bitmap.count(), 0);
 }
 
 int main(int argc, char **argv) {

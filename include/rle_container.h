@@ -20,8 +20,8 @@ public:
                                                       // [5,6,7,8,9,10]
 
 public:
-    RLEContainer(SizeType capacity = RLE_CONTAINER_INIT_CAPACITY, SizeType size = 0)
-        : capacity(capacity), size(size), runs(static_cast<RunPair*>(malloc(capacity * sizeof(RunPair)))) {
+    RLEContainer(SizeType capacity = RLE_CONTAINER_INIT_CAPACITY, SizeType run_count = 0)
+        : capacity(std::max(capacity, run_count)), run_count(run_count), runs(static_cast<RunPair*>(malloc(capacity * sizeof(RunPair)))) {
         assert(runs && "Failed to allocate memory for RLEContainer");
     }
 
@@ -31,65 +31,64 @@ public:
     RLEContainer& operator=(const RLEContainer&) = delete;
 
     void debug_print() const {
-        for (size_t i = 0; i < size; ++i) {
+        for (size_t i = 0; i < run_count; ++i) {
             std::cout << "[" << int(runs[i].first) << "," << int(runs[i].second) << "] ";
         }
         std::cout << std::endl;
     }
 
-    void clear() { size = 0; }
+    void clear() { run_count = 0; }
 
     /// @brief Set a bit of the container.
     /// @param num The bit to set.
     void set(IndexType num) {
-        if (!size) {
+        if (!run_count) {
             runs[0] = {num, num};
-            size = 1;
+            run_count = 1;
             return;
         }
-        auto pos = upper_bound(num);
-        if (pos < size && runs[pos].first <= num && num <= runs[pos].second) {
+        auto pos = lower_bound(num);
+        if (pos < run_count && runs[pos].first <= num && num <= runs[pos].second) {
             return;  // already set, do nothing.
         }
         set_raw(pos, num);
     }
 
     void reset(IndexType num) {
-        if (!size) return;
-        auto pos = upper_bound(num);
+        if (!run_count) return;
+        auto pos = lower_bound(num);
+        if (pos == run_count || runs[pos].first > num || runs[pos].second < num) return;
         auto old_end = runs[pos].second;
-        if (runs[pos].first > num || runs[pos].second < num) return;
-
         if (runs[pos].first == num && runs[pos].second == num) {  // run is a single element, just remove it
-            if (pos < size) memmove(&runs[pos], &runs[pos + 1], (size - pos - 1) * sizeof(RunPair));
-            --size;
+            if (pos < run_count) memmove(&runs[pos], &runs[pos + 1], (run_count - pos - 1) * sizeof(RunPair));
+            --run_count;
         } else if (runs[pos].first == num) {
             runs[pos].first++;
         } else if (runs[pos].second == num) {
             runs[pos].second--;
         } else {  // split the run [a,b] into: [a, num-1] and [num+1, b]
-            if (size == capacity) expand();
-            if (pos < size) std::memmove(&runs[pos + 2], &runs[pos + 1], (size - pos - 1) * sizeof(RunPair));
-            size++;
+            if (run_count == capacity) expand();
+            std::memmove(&runs[pos + 1], &runs[pos], (run_count - pos) * sizeof(RunPair));
+            run_count++;
             runs[pos].second = num - 1;
-            runs[pos + 1] = {num + 1, old_end};
+            runs[pos + 1].first = num + 1;
         }
     }
 
     bool test(IndexType num) const {
-        if (!size) return false;
-        auto pos = upper_bound(num);
-        return (pos < size && runs[pos].first <= num && num <= runs[pos].second);
+        if (!run_count) return false;
+        auto pos = lower_bound(num);
+        return (pos < run_count && runs[pos].first <= num && num <= runs[pos].second);
     }
 
     bool test_and_set(IndexType num) {
         bool was_set;
         IndexType pos;
-        if (!size) {
+        if (!run_count) {
             was_set = false;
         } else {
-            pos = upper_bound(num);
-            was_set = (pos < size && runs[pos].first <= num && num <= runs[pos].second);
+            pos = lower_bound(num);
+            was_set = (pos < run_count && runs[pos].first <= num && num <= runs[pos].second);
         }
         if (was_set) return false;
         set_raw(pos, num);
@@ -98,29 +97,29 @@ public:
 
     SizeType cardinality() const {
         SizeType count = 0;
-        for (IndexType i = 0; i < size; ++i) {
+        for (IndexType i = 0; i < run_count; ++i) {
             count += runs[i].second - runs[i].first;
         }
         // We need to add 1 to the count because the range is inclusive
-        return count + size;
+        return count + run_count;
     }
 
-    IndexType runsCount() const { return size; }
+    IndexType runsCount() const { return run_count; }
 
 private:
-    SizeType upper_bound(IndexType num) const {
-        assert(size && "Cannot find upper bound in an empty container");
-        SizeType low = 0;
-        SizeType high = size;
-        while (low < high) {
-            SizeType mid = low + (high - low) / 2;
-            if (runs[mid].first <= num) {
-                low = mid + 1;
+    SizeType lower_bound(IndexType num) const {
+        assert(run_count && "Cannot find lower bound in an empty container");
+        SizeType left = 0;
+        SizeType right = run_count;
+        while (left < right) {
+            SizeType mid = left + (right - left) / 2;
+            if (runs[mid].second < num) {
+                left = mid + 1;
             } else {
-                high = mid;
+                right = mid;
             }
         }
-        return (low > 0) ? low - 1 : 0;
+        return left;
     }
 
     void expand() {
@@ -133,37 +132,37 @@ private:
 
     void set_raw(IndexType pos, IndexType num) {
         // If the value is next to the previous run's end (and need merging)
-        bool merge_prev = (num > 0 && num - 1 == runs[pos].second);
+        bool merge_prev = (pos > 0 && num > 0 && num - 1 == runs[pos - 1].second);
         // If the value is next to the next run's start (and need merging)
-        bool merge_next = (pos < size - 1 && runs[pos + 1].first > 0 && runs[pos + 1].first - 1 == num);
+        bool merge_next = (pos < run_count && runs[pos].first > 0 && runs[pos].first - 1 == num);
         if (merge_prev && merge_next) {  // [a,num-1] + num + [num+1, b]
 
-            runs[pos].second = runs[pos + 1].second;
-            if (pos < size) std::memmove(&runs[pos + 1], &runs[pos + 2], (size - pos - 1) * sizeof(RunPair));
-            size--;
+            runs[pos - 1].second = runs[pos].second;
+            if (pos < run_count) std::memmove(&runs[pos], &runs[pos + 1], (run_count - pos - 1) * sizeof(RunPair));
+            run_count--;
             return;
         }
-        if (merge_prev) {  // [a,num-1] + num
-            runs[pos].second++;
+        if (merge_prev) {  // [a,num-1] + num -> [a, num]
+            runs[pos - 1].second++;
             return;
         }
-        if (merge_next) {  // num + [num+1, b]
-            runs[pos + 1].first--;
+        if (merge_next) {  // num + [num+1, b] -> [num, b]
+            runs[pos].first--;
             return;
         }
 
-        if (size == capacity) {
+        if (run_count == capacity) {
             expand();
         }
-        if (pos < size) std::memmove(&runs[pos + 2], &runs[pos + 1], (size - pos - 1) * sizeof(RunPair));
-        size++;
-        runs[pos + 1] = {num, num};
+        if (pos < run_count) std::memmove(&runs[pos + 1], &runs[pos], (run_count - pos) * sizeof(RunPair));
+        run_count++;
+        runs[pos] = {num, num};
         return;
     }
 
 public:
     SizeType capacity;
-    IndexType size;  // Always less than 2**(DataBits-1), so we do not need SizeType
+    IndexType run_count;  // Always less than 2**(DataBits-1), so we do not need SizeType
     RunPair* runs;
 };
 }  // namespace froaring

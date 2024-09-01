@@ -24,7 +24,7 @@ public:
     }
 
     ArrayContainer(SizeType capacity = ARRAY_CONTAINER_INIT_CAPACITY, SizeType size = 0)
-        : capacity(capacity),
+        : capacity(std::max(capacity, size)),
           size(size),
           vals(static_cast<IndexOrNumType*>(malloc(capacity * sizeof(IndexOrNumType)))) {
         assert(vals && "Failed to allocate memory for ArrayContainer");
