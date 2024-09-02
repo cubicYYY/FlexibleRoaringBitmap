@@ -1,8 +1,8 @@
 #pragma once
 
 #include "handle.h"
+#include "prelude.h"
 #include "transform.h"
-#include "utils.h"
 
 namespace froaring {
 
@@ -289,7 +289,24 @@ public:
                 FROARING_UNREACHABLE
         }
     }
-
+    void clear() {
+        for (SizeType i = 0; i < size; ++i) {
+            switch (containers[i].type) {
+                case CTy::Array:
+                    static_cast<ArrayContainer<WordType, DataBits>*>(containers[i].ptr)->clear();
+                    break;
+                case CTy::Bitmap:
+                    static_cast<BitmapContainer<WordType, DataBits>*>(containers[i].ptr)->clear();
+                    break;
+                case CTy::RLE:
+                    static_cast<RLEContainer<WordType, DataBits>*>(containers[i].ptr)->clear();
+                    break;
+                default:
+                    FROARING_UNREACHABLE
+            }
+        }
+        size = 0;
+    }
     // Release all containers
     ~BinsearchIndex() {
         for (SizeType i = 0; i < size; ++i) {
@@ -312,8 +329,7 @@ public:
     }
 
     static BinsearchIndex<WordType, IndexBits, DataBits>* and_(const BinsearchIndex<WordType, IndexBits, DataBits>* a,
-                                                               const BinsearchIndex<WordType, IndexBits, DataBits>* b,
-                                                               CTy& res_type) {
+                                                               const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
         auto result = new BinsearchIndex<WordType, IndexBits, DataBits>(a->capacity, 0);
         size_t i = 0, j = 0;
         size_t new_container_counts = 0;
@@ -323,17 +339,17 @@ public:
             } else if (a->containers[i].index > b->containers[j].index) {
                 j++;
             } else {
-                CTy res_type;
-                auto res = froaring_and<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr,
-                                                            a->containers[i].type, b->containers[j].type, res_type);
-                result->containers[new_container_counts++] = ContainerHandle(res, res_type, a->containers[i].index);
+                CTy local_res_type;
+                auto res =
+                    froaring_and<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr, a->containers[i].type,
+                                                     b->containers[j].type, local_res_type);
+                result->containers[new_container_counts++] =
+                    ContainerHandle(res, local_res_type, a->containers[i].index);
                 i++;
                 j++;
             }
         }
         result->size = new_container_counts;
-        res_type = CTy::Containers;
-        // TODO: convert to single container if possible
         return result;
     }
     static bool equals(const BinsearchIndex<WordType, IndexBits, DataBits>* a,

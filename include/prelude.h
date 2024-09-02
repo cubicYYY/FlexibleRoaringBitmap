@@ -10,13 +10,16 @@
 
 namespace froaring {
 
-#define CTYPE_PAIR(t1, t2) (static_cast<int>(t1) * 4 + static_cast<int>(t2))
-enum class ContainerType { Array, Bitmap, RLE, Containers };
+#define CTYPE_PAIR(t1, t2) (static_cast<uint8_t>(t1) * 4 + static_cast<uint8_t>(t2))
+enum class ContainerType : uint8_t { Array, Bitmap, RLE, Containers };
+
 const int ARRAY_CONTAINER_INIT_CAPACITY = 4;
 const int RLE_CONTAINER_INIT_CAPACITY = 4;
 const int CONTAINERS_INIT_CAPACITY = 16;
 /// so we will use linear scan instead of bin-search for small containers
 const size_t MINIMAL_SIZE_TO_BINSEARCH = 8;
+
+// Markers
 struct froaring_container_t {};
 struct froaring_indices_t : public froaring_container_t {};
 using froaring_container_t = struct froaring_container_t;

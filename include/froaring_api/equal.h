@@ -3,7 +3,7 @@
 // TODO: to const pointers
 #include <bit>
 
-#include "utils.h"
+#include "prelude.h"
 
 namespace froaring {
 using CTy = froaring::ContainerType;

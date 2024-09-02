@@ -2,7 +2,10 @@
 
 #include <bit>
 
-#include "utils.h"
+#include "array_container.h"
+#include "bitmap_container.h"
+#include "prelude.h"
+#include "rle_container.h"
 
 namespace froaring {
 using CTy = froaring::ContainerType;
@@ -40,7 +43,7 @@ froaring_container_t* froaring_and_aa(const ArrayContainer<WordType, DataBits>* 
             ++j;
         }
     }
-
+    std::cout << "ArrayIntersect: " << int(result->size) << std::endl;
     result_type = CTy::Array;
     return result;
 }
@@ -63,7 +66,7 @@ froaring_container_t* froaring_and_rr(const RLEContainer<WordType, DataBits>* a,
         } else if (run_b.end < run_a.start) {
             ++j;
         } else {
-            result->runs[new_card++]={std::max(run_a.start, run_b.start), std::min(run_a.end, run_b.end)};
+            result->runs[new_card++] = {std::max(run_a.start, run_b.start), std::min(run_a.end, run_b.end)};
             if (run_a.end < run_b.end) {
                 ++i;
             } else {
@@ -180,7 +183,7 @@ froaring_container_t* froaring_and_ba(const BitmapContainer<WordType, DataBits>*
         result->vals[newcard] = val;
         newcard += a->test(val);
     }
-    result -> size = newcard;
+    result->size = newcard;
     result_type = CTy::Array;
     return result;
 }
@@ -193,40 +196,31 @@ froaring_container_t* froaring_and(const froaring_container_t* a, const froaring
     using BitmapSized = BitmapContainer<WordType, DataBits>;
     switch (CTYPE_PAIR(ta, tb)) {
         case CTYPE_PAIR(CTy::Bitmap, CTy::Bitmap): {
-            return froaring_and_bb(static_cast<const BitmapSized*>(a),
-                                   static_cast<const BitmapSized*>(b), result_type);
+            return froaring_and_bb(static_cast<const BitmapSized*>(a), static_cast<const BitmapSized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::Array): {
-            return froaring_and_aa(static_cast<const ArraySized*>(a),
-                                   static_cast<const ArraySized*>(b), result_type);
+            return froaring_and_aa(static_cast<const ArraySized*>(a), static_cast<const ArraySized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::RLE, CTy::RLE): {
-            return froaring_and_rr(static_cast<const RLESized*>(a),
-                                   static_cast<const RLESized*>(b), result_type);
+            return froaring_and_rr(static_cast<const RLESized*>(a), static_cast<const RLESized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Bitmap, CTy::Array): {
-            return froaring_and_ba(static_cast<const BitmapSized*>(a),
-                                   static_cast<const ArraySized*>(b), result_type);
+            return froaring_and_ba(static_cast<const BitmapSized*>(a), static_cast<const ArraySized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::Bitmap): {
-            return froaring_and_ba(static_cast<const BitmapSized*>(b),
-                                   static_cast<const ArraySized*>(a), result_type);
+            return froaring_and_ba(static_cast<const BitmapSized*>(b), static_cast<const ArraySized*>(a), result_type);
         }
         case CTYPE_PAIR(CTy::Bitmap, CTy::RLE): {
-            return froaring_and_br(static_cast<const BitmapSized*>(a),
-                                   static_cast<const RLESized*>(b), result_type);
+            return froaring_and_br(static_cast<const BitmapSized*>(a), static_cast<const RLESized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::RLE, CTy::Bitmap): {
-            return froaring_and_br(static_cast<const BitmapSized*>(b),
-                                   static_cast<const RLESized*>(a), result_type);
+            return froaring_and_br(static_cast<const BitmapSized*>(b), static_cast<const RLESized*>(a), result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::RLE): {
-            return froaring_and_ar(static_cast<const ArraySized*>(a),
-                                   static_cast<const RLESized*>(b), result_type);
+            return froaring_and_ar(static_cast<const ArraySized*>(a), static_cast<const RLESized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::RLE, CTy::Array): {
-            return froaring_and_ar(static_cast<const ArraySized*>(b),
-                                   static_cast<const RLESized*>(a), result_type);
+            return froaring_and_ar(static_cast<const ArraySized*>(b), static_cast<const RLESized*>(a), result_type);
         }
         default:
             FROARING_UNREACHABLE

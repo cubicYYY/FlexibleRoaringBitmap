@@ -45,7 +45,7 @@ public:
         std::cout << std::endl;
     }
 
-    void clear() { std::memset(words.data(), 0, WordsCount * sizeof(WordType)); }
+    void clear() { std::memset(words, 0, WordsCount * sizeof(WordType)); }
 
     void set(NumType index) { words[index / BitsPerWord] |= ((WordType)1 << (index % BitsPerWord)); }
 

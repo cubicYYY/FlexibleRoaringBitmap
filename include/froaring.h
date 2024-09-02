@@ -13,7 +13,6 @@
 #include "bitmap_container.h"
 #include "prelude.h"
 #include "rle_container.h"
-#include "utils.h"
 
 namespace froaring {
 /// @brief A flexible Roaring bitmap consists with a binary-search-indexed
@@ -47,10 +46,20 @@ public:
               CTy::Array,
               UNKNOWN_INDEX,
           }) {}
-
+    FlexibleRoaringBitmap(froaring_container_t* container, CTy type, IndexType index = UNKNOWN_INDEX)
+        : handle({
+              container,
+              type,
+              index,
+          }) {}
+    FlexibleRoaringBitmap(ContainerHandle&& handle) : handle(std::move(handle)) {}
     FlexibleRoaringBitmap(FlexibleRoaringBitmap&& other) = default;
+    FlexibleRoaringBitmap& operator=(FlexibleRoaringBitmap&& other) = default;
 
     ~FlexibleRoaringBitmap() {
+        if (!handle.ptr) {
+            return;
+        }
         switch (handle.type) {
             case CTy::Array:
                 delete static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr);
@@ -70,6 +79,9 @@ public:
     }
 
     void debug_print() {
+        if (!is_inited()) {
+            std::cout << "NULL!" << std::endl;
+        }
         switch (handle.type) {
             case CTy::Array:
                 static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->debug_print();
@@ -249,6 +261,28 @@ public:
         return 0;
     }
 
+    void clear() {
+        if (!is_inited()) {
+            return;
+        }
+
+        switch (handle.type) {
+            case CTy::Array:
+                static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->clear();
+                break;
+            case CTy::Bitmap:
+                static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->clear();
+                break;
+            case CTy::RLE:
+                static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->clear();
+                break;
+            case CTy::Containers:
+                castToContainers(handle.ptr)->clear();
+                break;
+            default:
+                FROARING_UNREACHABLE
+        }
+    }
     bool operator==(const FlexibleRoaringBitmap& other) const {
         if (!is_inited()) {
             return (other.count() == 0);
@@ -276,47 +310,58 @@ public:
     }
 
     FlexibleRoaringBitmap operator&(const FlexibleRoaringBitmap& other) const noexcept {
-        auto result = FlexibleRoaringBitmap();
-        if (!is_inited() || !other.is_inited() || handle.index != other.handle.index) {
-            return result;
+        if (!is_inited() || !other.is_inited()) {
+            return FlexibleRoaringBitmap();
         }
         // Both containers
         if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
-            result.set_inited();
-            result.handle.index = ANY_INDEX;
-            result.handle.ptr = ContainersSized::and_(castToContainers(handle.ptr), castToContainers(other.handle.ptr),
-                                                      result.handle.type);
+            auto new_containers =
+                ContainersSized::and_(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
+            if (new_containers->size == 0) {
+                delete new_containers;
+                return FlexibleRoaringBitmap();
+            }
+            if (new_containers->size == 1) {
+                auto handle = std::move(new_containers->containers[0]);
+                new_containers->size = 0;
+                delete new_containers;
+                return FlexibleRoaringBitmap(std::move(handle));
+            }
+            return FlexibleRoaringBitmap(new_containers, CTy::Containers, ANY_INDEX);
         }
 
         // One of them are containers:
         if (handle.type == CTy::Containers) {  // the other is not containers
-            const ContainerHandle& lhs = castToContainers(handle.ptr)->containers[0];
+            auto containers = castToContainers(handle.ptr);
             const ContainerHandle& rhs = other.handle;
+            const ContainerHandle& lhs = containers->containers[containers->lower_bound(rhs.index)];
             if (lhs.index != rhs.index) {
-                return result;
+                return FlexibleRoaringBitmap();
             }
-            result.set_inited();
-            result.handle.index = lhs.index;
-            result.handle.ptr =
-                froaring_and<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, result.handle.type);
-        }
-        if (other.handle.type == CTy::Containers) {  // other is not containers
-            const ContainerHandle& lhs = castToContainers(other.handle.ptr)->containers[0];
-            const ContainerHandle& rhs = other.handle;
-            if (lhs.index != rhs.index) {
-                return result;
-            }
-            result.set_inited();
-            result.handle.index = lhs.index;
-            result.handle.ptr =
-                froaring_and<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, result.handle.type);
-        }
 
+            CTy local_res_type;
+            auto ptr = froaring_and<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, local_res_type);
+            return FlexibleRoaringBitmap(ptr, local_res_type, lhs.index);
+        }
+        if (other.handle.type == CTy::Containers) {  // this is not containers
+            auto containers = castToContainers(handle.ptr);
+            const ContainerHandle& rhs = handle;
+            const ContainerHandle& lhs = containers->containers[containers->lower_bound(rhs.index)];
+            if (lhs.index != rhs.index) {
+                return FlexibleRoaringBitmap();
+            }
+            CTy local_res_type;
+            auto ptr = froaring_and<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, local_res_type);
+            return FlexibleRoaringBitmap(ptr, local_res_type, lhs.index);
+        }
         // Both are single container:
-        result.handle.ptr = froaring_and<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type,
-                                                             other.handle.type, result.handle.type);
-        result.handle.index = handle.index;
-        return result;
+        if (handle.index != other.handle.index) {
+            return FlexibleRoaringBitmap();
+        }
+        CTy local_res_type;
+        auto ptr = froaring_and<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type, other.handle.type,
+                                                    local_res_type);
+        return FlexibleRoaringBitmap(ptr, local_res_type, handle.index);
     }
 
     /// @brief Called when the current container exceeds the block size:
@@ -327,7 +372,7 @@ public:
         ContainersSized* containers = new ContainersSized(CONTAINERS_INIT_CAPACITY, 1);
         // TODO: do not modify the containers directly
         containers->containers[0] = std::move(handle);
-        handle = ContainerHandle(containers, CTy::Containers, 0);
+        handle = ContainerHandle(containers, CTy::Containers, ANY_INDEX);
     }
 
     bool is_inited() const { return handle.index != UNKNOWN_INDEX; }
