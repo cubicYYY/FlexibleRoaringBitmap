@@ -3,16 +3,17 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <vector>
 
+#include "api.h"
 #include "array_container.h"
 #include "binsearch_index.h"
 #include "bitmap_container.h"
 #include "prelude.h"
 #include "rle_container.h"
 #include "utils.h"
-#include "api.h"
 
 namespace froaring {
 /// @brief A flexible Roaring bitmap consists with a binary-search-indexed
@@ -35,6 +36,8 @@ class FlexibleRoaringBitmap {
     using ArraySized = ArrayContainer<WordType, DataBits>;
     using CTy = froaring::ContainerType;  // handy local alias
     using ContainerHandle = froaring::ContainerHandle<IndexType>;
+    static constexpr IndexType UNKNOWN_INDEX = std::numeric_limits<IndexType>::max();
+    static constexpr IndexType ANY_INDEX = 0;
 
 public:
     /// We start from an array container.
@@ -42,19 +45,21 @@ public:
         : handle({
               new ArraySized(),
               CTy::Array,
-              0,
+              UNKNOWN_INDEX,
           }) {}
+
+    FlexibleRoaringBitmap(FlexibleRoaringBitmap&& other) = default;
 
     ~FlexibleRoaringBitmap() {
         switch (handle.type) {
             case CTy::Array:
-                delete CAST_TO_ARRAY(handle.ptr);
+                delete static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr);
                 break;
             case CTy::Bitmap:
-                delete CAST_TO_BITMAP(handle.ptr);
+                delete static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr);
                 break;
             case CTy::RLE:
-                delete CAST_TO_RLE(handle.ptr);
+                delete static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr);
                 break;
             case CTy::Containers:
                 delete castToContainers(handle.ptr);
@@ -67,13 +72,13 @@ public:
     void debug_print() {
         switch (handle.type) {
             case CTy::Array:
-                CAST_TO_ARRAY(handle.ptr)->debug_print();
+                static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->debug_print();
                 break;
             case CTy::Bitmap:
-                CAST_TO_BITMAP(handle.ptr)->debug_print();
+                static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->debug_print();
                 break;
             case CTy::RLE:
-                CAST_TO_RLE(handle.ptr)->debug_print();
+                static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->debug_print();
                 break;
             case CTy::Containers:
                 castToContainers(handle.ptr)->debug_print();
@@ -93,11 +98,11 @@ public:
         can_fit_t<DataBits> data;
         num2index_n_data<IndexBits, DataBits>(num, index, data);
 
-        if (!was_set()) {
-            flag |= WAS_SET;
+        if (!is_inited()) {
+            set_inited();
             handle.index = index;
             assert(handle.type == CTy::Array && "Invalid initial container type");
-            CAST_TO_ARRAY(handle.ptr)->set(data);
+            static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->set(data);
             return;
         }
         if (handle.index != index) {  // Single container, and is set:
@@ -108,13 +113,13 @@ public:
 
         switch (handle.type) {
             case CTy::Array:
-                CAST_TO_ARRAY(handle.ptr)->set(data);
+                static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->set(data);
                 break;
             case CTy::Bitmap:
-                CAST_TO_BITMAP(handle.ptr)->set(data);
+                static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->set(data);
                 break;
             case CTy::RLE:
-                CAST_TO_RLE(handle.ptr)->set(data);
+                static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->set(data);
                 break;
             default:
                 FROARING_UNREACHABLE
@@ -122,7 +127,7 @@ public:
     }
 
     bool test(WordType num) const {
-        if (!was_set()) {
+        if (!is_inited()) {
             return false;
         }
 
@@ -139,11 +144,13 @@ public:
         }
         switch (handle.type) {
             case CTy::Array:
-                return index == handle.index && CAST_TO_ARRAY(handle.ptr)->test(data);
+                return index == handle.index &&
+                       static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->test(data);
             case CTy::Bitmap:
-                return index == handle.index && CAST_TO_BITMAP(handle.ptr)->test(data);
+                return index == handle.index &&
+                       static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->test(data);
             case CTy::RLE:
-                return index == handle.index && CAST_TO_RLE(handle.ptr)->test(data);
+                return index == handle.index && static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->test(data);
             case CTy::Containers:
                 return castToContainers(handle.ptr)->test(num);
             default:
@@ -153,8 +160,43 @@ public:
         return false;
     }
 
+    bool test_and_set(WordType num) {
+        if (!is_inited()) {
+            set(num);
+            return true;
+        }
+
+        if (handle.type == CTy::Containers) {
+            return castToContainers(handle.ptr)->test_and_set(num);
+        }
+
+        can_fit_t<IndexBits> index;
+        can_fit_t<DataBits> data;
+        num2index_n_data<IndexBits, DataBits>(num, index, data);
+
+        if (handle.index != index) {  // Single container, and is set:
+            switchToContainers();
+            castToContainers(handle.ptr)->set(num);
+            return true;
+        }
+
+        switch (handle.type) {
+            case CTy::Array:
+                return static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->test_and_set(data);
+            case CTy::Bitmap:
+                return static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->test_and_set(data);
+            case CTy::RLE:
+                return static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->test_and_set(data);
+            case CTy::Containers:
+                return castToContainers(handle.ptr)->test_and_set(num);
+            default:
+                FROARING_UNREACHABLE
+        }
+        return false;
+    }
+
     void reset(WordType num) {
-        if (!was_set()) {
+        if (!is_inited()) {
             return;
         }
         if (handle.type == CTy::Containers) {
@@ -171,13 +213,13 @@ public:
 
         switch (handle.type) {
             case CTy::Array:
-                CAST_TO_ARRAY(handle.ptr)->reset(data);
+                static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->reset(data);
                 break;
             case CTy::Bitmap:
-                CAST_TO_BITMAP(handle.ptr)->reset(data);
+                static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->reset(data);
                 break;
             case CTy::RLE:
-                CAST_TO_RLE(handle.ptr)->reset(data);
+                static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->reset(data);
                 break;
             case CTy::Containers:
                 castToContainers(handle.ptr)->reset(num);
@@ -188,17 +230,17 @@ public:
     }
 
     size_t count() const {
-        if (!was_set()) {
+        if (!is_inited()) {
             return 0;
         }
 
         switch (handle.type) {
             case CTy::Array:
-                return CAST_TO_ARRAY(handle.ptr)->cardinality();
+                return static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->cardinality();
             case CTy::Bitmap:
-                return CAST_TO_BITMAP(handle.ptr)->cardinality();
+                return static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->cardinality();
             case CTy::RLE:
-                return CAST_TO_RLE(handle.ptr)->cardinality();
+                return static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->cardinality();
             case CTy::Containers:
                 return castToContainers(handle.ptr)->cardinality();
             default:
@@ -208,23 +250,73 @@ public:
     }
 
     bool operator==(const FlexibleRoaringBitmap& other) const {
-        if (!was_set()) {
+        if (!is_inited()) {
             return (other.count() == 0);
         }
         if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
-            return froaring_equal_bsbs(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
+            return ContainersSized::equals(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
         }
-        if (handle.type == CTy::Containers) { // the other is not containers
+        if (handle.type == CTy::Containers) {  // the other is not containers
             const ContainerHandle& lhs = castToContainers(handle.ptr)->containers[0];
             const ContainerHandle& rhs = other.handle;
+            if (lhs.index != rhs.index) {
+                return false;
+            }
             return froaring_equal<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type);
         }
-        if (other.handle.type == CTy::Containers) { // other is not containers
+        if (other.handle.type == CTy::Containers) {  // other is not containers
             const ContainerHandle& lhs = castToContainers(other.handle.ptr)->containers[0];
             const ContainerHandle& rhs = other.handle;
+            if (lhs.index != rhs.index) {
+                return false;
+            }
             return froaring_equal<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type);
         }
         return froaring_equal<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type, other.handle.type);
+    }
+
+    FlexibleRoaringBitmap operator&(const FlexibleRoaringBitmap& other) const noexcept {
+        auto result = FlexibleRoaringBitmap();
+        if (!is_inited() || !other.is_inited() || handle.index != other.handle.index) {
+            return result;
+        }
+        // Both containers
+        if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
+            result.set_inited();
+            result.handle.index = ANY_INDEX;
+            result.handle.ptr = ContainersSized::and_(castToContainers(handle.ptr), castToContainers(other.handle.ptr),
+                                                      result.handle.type);
+        }
+
+        // One of them are containers:
+        if (handle.type == CTy::Containers) {  // the other is not containers
+            const ContainerHandle& lhs = castToContainers(handle.ptr)->containers[0];
+            const ContainerHandle& rhs = other.handle;
+            if (lhs.index != rhs.index) {
+                return result;
+            }
+            result.set_inited();
+            result.handle.index = lhs.index;
+            result.handle.ptr =
+                froaring_and<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, result.handle.type);
+        }
+        if (other.handle.type == CTy::Containers) {  // other is not containers
+            const ContainerHandle& lhs = castToContainers(other.handle.ptr)->containers[0];
+            const ContainerHandle& rhs = other.handle;
+            if (lhs.index != rhs.index) {
+                return result;
+            }
+            result.set_inited();
+            result.handle.index = lhs.index;
+            result.handle.ptr =
+                froaring_and<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, result.handle.type);
+        }
+
+        // Both are single container:
+        result.handle.ptr = froaring_and<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type,
+                                                             other.handle.type, result.handle.type);
+        result.handle.index = handle.index;
+        return result;
     }
 
     /// @brief Called when the current container exceeds the block size:
@@ -235,27 +327,28 @@ public:
         ContainersSized* containers = new ContainersSized(CONTAINERS_INIT_CAPACITY, 1);
         // TODO: do not modify the containers directly
         containers->containers[0] = std::move(handle);
-        handle = ContainerHandle(containers, CTy::Containers, -1);
+        handle = ContainerHandle(containers, CTy::Containers, 0);
     }
 
-    bool was_set() const { return flag & WAS_SET; }
+    bool is_inited() const { return handle.index != UNKNOWN_INDEX; }
+    void set_inited() {}
 
 private:
     ContainersSized* castToContainers(froaring_container_t* p) { return static_cast<ContainersSized*>(p); }
     froaring_container_t* castToFroaring(ContainersSized* p) { return static_cast<froaring_container_t*>(p); }
-    const ContainersSized* castToContainers(const froaring_container_t* p) { return static_cast<const ContainersSized*>(p); }
-    const froaring_container_t* castToFroaring(const ContainersSized* p) { return static_cast<const froaring_container_t*>(p); }
+    const ContainersSized* castToContainers(const froaring_container_t* p) {
+        return static_cast<const ContainersSized*>(p);
+    }
+    const froaring_container_t* castToFroaring(const ContainersSized* p) {
+        return static_cast<const froaring_container_t*>(p);
+    }
 
     const ContainersSized* castToContainers(const froaring_container_t* p) const {
         return static_cast<const ContainersSized*>(p);
     }
 
 public:
-    /// Bit#0: =0 if was NEVER set and the index in the handle is NOT
-    /// determined; otherwise =1.
-    /// Other bits: preserved
-    uint8_t flag = 0;
-    ContainerHandle handle{};
+    ContainerHandle handle;
     // Possibilities:
     // If only a single container is needed, we can store it directly:
     // RLESized* rleContainer;

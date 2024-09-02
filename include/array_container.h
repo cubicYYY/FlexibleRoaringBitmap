@@ -14,6 +14,11 @@ class ArrayContainer : public froaring_container_t {
 public:
     using IndexOrNumType = froaring::can_fit_t<DataBits>;
     using SizeType = froaring::can_fit_t<DataBits + 1>;
+    /// Bit capacity for containers indexed
+    static constexpr size_t ContainerCapacity = (1 << DataBits);
+    /// Array threshold (Array will not be optimum for storing more
+    /// elements)
+    static constexpr size_t ArrayToBitmapCountThreshold = ContainerCapacity / DataBits;
 
 public:
     void debug_print() {

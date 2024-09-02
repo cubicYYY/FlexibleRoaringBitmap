@@ -4,7 +4,7 @@
 #include <cassert>
 #include <new>
 
-#define WAS_SET 0x1
+#define INIT_FLAG 0x1
 #define FROARING_UNREACHABLE assert(false && "Should never reach here");
 #define FROARING_NOT_IMPLEMENTED assert(false && "Not implemented yet");
 
@@ -79,9 +79,8 @@ void num2index_n_data(can_fit_t<IndexBits + DataBits> value, can_fit_t<IndexBits
 /// @brief Get log2(x) floored at compile time.
 /// @example cexpr_log2(8) = 3, cexpr_log2(9) = 3, cexpr_log2(16) = 4
 template <typename T>
-constexpr T cexpr_log2(T x)
-{
-    return x == 1 ? 0 : 1+cexpr_log2(x >> 1);
+constexpr T cexpr_log2(T x) {
+    return x == 1 ? 0 : 1 + cexpr_log2(x >> 1);
 }
 
 }  // namespace froaring
