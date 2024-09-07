@@ -35,7 +35,15 @@ public:
         assert(vals && "Failed to allocate memory for ArrayContainer");
     }
 
-    ~ArrayContainer() { free(vals); }
+    ~ArrayContainer() {
+        std::cout << "~Array" << (void*)this << std::endl;
+
+        std::cout << "freeing vals" << (void*)vals << std::endl;
+        free(vals);
+
+        std::cout << "~Array"
+                  << "done" << std::endl;
+    }
 
     ArrayContainer(const ArrayContainer&) = delete;
     ArrayContainer& operator=(const ArrayContainer&) = delete;

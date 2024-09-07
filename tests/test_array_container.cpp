@@ -16,6 +16,8 @@ protected:
         container->set(2);
         container->set(3);
     }
+
+    void TearDown() override { delete container; }
 };
 
 TEST_F(ArrayContainerTest, SetBoundaryTest) {

@@ -14,7 +14,7 @@ template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_bb(const BitmapContainer<WordType, DataBits>* a,
                                       const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
     auto* result = new BitmapContainer<WordType, DataBits>();
-    for (auto i = 0; i < a->WordsCount; ++i) {
+    for (size_t i = 0; i < a->WordsCount; ++i) {
         result->words[i] = a->words[i] & b->words[i];
     }
     result_type = CTy::Bitmap;
@@ -24,67 +24,100 @@ froaring_container_t* froaring_and_bb(const BitmapContainer<WordType, DataBits>*
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_aa(const ArrayContainer<WordType, DataBits>* a,
                                       const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
-    auto* result = new ArrayContainer<WordType, DataBits>();
+    auto* result = new ArrayContainer<WordType, DataBits>(std::min(a->size, b->size));
     if (a->size == 0 || b->size == 0) {
         result_type = CTy::Array;
         return result;
     }
     size_t i = 0, j = 0;
-
+    size_t new_card = 0;
     // Linear scan
-    while (i < a->size && j < b->size) {
-        if (a->vals[i] < b->vals[j]) {
+    result_type = CTy::Array;
+    while (true) {
+        while (a->vals[i] < b->vals[j]) {
+        SKIP_FIRST_COMPARE:
             ++i;
-        } else if (a->vals[i] > b->vals[j]) {
+            if (i == a->size) {
+                result->size = new_card;
+                return result;
+            }
+        }
+        while (a->vals[i] > b->vals[j]) {
             ++j;
+            if (j == b->size) {
+                result->size = new_card;
+                return result;
+            }
+        }
+        if (a->vals[i] == b->vals[j]) {
+            result->vals[new_card++] = a->vals[i];
+            ++i;
+            ++j;
+            if (i == a->size || j == b->size) {
+                result->size = new_card;
+                return result;
+            }
         } else {
-            result->vals[result->size++] = a->vals[i];
-            ++i;
-            ++j;
+            goto SKIP_FIRST_COMPARE;
         }
     }
-    std::cout << "ArrayIntersect: " << int(result->size) << std::endl;
-    result_type = CTy::Array;
-    return result;
+    FROARING_UNREACHABLE
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_rr(const RLEContainer<WordType, DataBits>* a,
                                       const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
-    auto* result = new RLEContainer<WordType, DataBits>();
+    result_type = CTy::RLE;
+
+    auto* result = new RLEContainer<WordType, DataBits>(a->runsCount() + b->runsCount());
     if (a->run_count == 0 || b->run_count == 0) {
-        result_type = CTy::RLE;
         return result;
     }
     size_t i = 0, j = 0;
     size_t new_card = 0;
-    while (i < a->run_count && j < b->run_count) {
+    while (true) {
         auto& run_a = a->runs[i];
         auto& run_b = b->runs[j];
-        if (run_a.end < run_b.start) {
+        while (run_a.end < run_b.start) {
+        SKIP_FIRST_COMPARE:
             ++i;
-        } else if (run_b.end < run_a.start) {
+            if (i == a->run_count) {
+                result->run_count = new_card;
+                return result;
+            }
+        }
+        while (run_b.end < run_a.start) {
             ++j;
-        } else {
+            if (j == b->run_count) {
+                result->run_count = new_card;
+                return result;
+            }
+        }
+        if (run_a.end >= run_b.start && run_b.end >= run_a.start) {
             result->runs[new_card++] = {std::max(run_a.start, run_b.start), std::min(run_a.end, run_b.end)};
             if (run_a.end < run_b.end) {
                 ++i;
             } else {
                 ++j;
             }
+            if (i == a->run_count || j == b->run_count) {
+                result->run_count = new_card;
+                return result;
+            }
+        } else {
+            goto SKIP_FIRST_COMPARE;
         }
     }
-    result->run_count = new_card;
-    result_type = CTy::RLE;
-    return result;
+    FROARING_UNREACHABLE
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_ar(const ArrayContainer<WordType, DataBits>* a,
                                       const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
-    auto* result = new ArrayContainer<WordType, DataBits>();
+    result_type = CTy::Array;
+
+    auto* result = new ArrayContainer<WordType, DataBits>(a->cardinality());
     if (a->size == 0 || b->run_count == 0) {
-        result_type = CTy::Array;
         return result;
     }
 
@@ -99,7 +132,6 @@ froaring_container_t* froaring_and_ar(const ArrayContainer<WordType, DataBits>* 
             ++rlepos;
             if (rlepos == b->run_count) {  // done
                 result->size = newcard;
-                result_type = CTy::Array;
                 return result;
             }
             rle = b->runs[rlepos];
@@ -116,7 +148,6 @@ froaring_container_t* froaring_and_ar(const ArrayContainer<WordType, DataBits>* 
     }
 
     result->size = newcard;
-    result_type = CTy::Array;
     return result;
 }
 
@@ -170,11 +201,12 @@ froaring_container_t* froaring_and_br(const BitmapContainer<WordType, DataBits>*
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_ba(const BitmapContainer<WordType, DataBits>* a,
                                       const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+    result_type = CTy::Array;
+
     auto* result = new ArrayContainer<WordType, DataBits>();
     auto array_size = b->cardinality();
     size_t newcard = 0;
     if (array_size == 0) {
-        result_type = CTy::Array;
         return result;
     }
     // This branchless implementation reduces branch mispredictions
@@ -184,7 +216,6 @@ froaring_container_t* froaring_and_ba(const BitmapContainer<WordType, DataBits>*
         newcard += a->test(val);
     }
     result->size = newcard;
-    result_type = CTy::Array;
     return result;
 }
 

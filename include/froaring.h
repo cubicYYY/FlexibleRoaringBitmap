@@ -45,7 +45,9 @@ public:
               new ArraySized(),
               CTy::Array,
               UNKNOWN_INDEX,
-          }) {}
+          }) {
+        std::cout << "FRBM: arr=" << (void*)handle.ptr << std::endl;
+    }
     FlexibleRoaringBitmap(froaring_container_t* container, CTy type, IndexType index = UNKNOWN_INDEX)
         : handle({
               container,
@@ -57,24 +59,16 @@ public:
     FlexibleRoaringBitmap& operator=(FlexibleRoaringBitmap&& other) = default;
 
     ~FlexibleRoaringBitmap() {
+        std::cout << "~FRBM" << (void*)this << std::endl;
         if (!handle.ptr) {
             return;
         }
-        switch (handle.type) {
-            case CTy::Array:
-                delete static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr);
-                break;
-            case CTy::Bitmap:
-                delete static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr);
-                break;
-            case CTy::RLE:
-                delete static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr);
-                break;
-            case CTy::Containers:
-                delete castToContainers(handle.ptr);
-                break;
-            default:
-                FROARING_UNREACHABLE
+        if (handle.type == CTy::Containers) {
+            std::cout << "Deleting containers..." << (void*)handle.ptr << std::endl;
+            delete castToContainers(handle.ptr);
+        } else {
+            std::cout << "Deleting single..." << std::endl;
+            release_container<WordType, DataBits>(handle.ptr, handle.type);
         }
     }
 
@@ -318,12 +312,14 @@ public:
             auto new_containers =
                 ContainersSized::and_(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
             if (new_containers->size == 0) {
+                std::cout << "Deleting new_containers..." << (void*)new_containers << std::endl;
                 delete new_containers;
                 return FlexibleRoaringBitmap();
             }
             if (new_containers->size == 1) {
                 auto handle = std::move(new_containers->containers[0]);
                 new_containers->size = 0;
+                std::cout << "Deleting new_containers2..." << (void*)new_containers << std::endl;
                 delete new_containers;
                 return FlexibleRoaringBitmap(std::move(handle));
             }
@@ -362,6 +358,70 @@ public:
         auto ptr = froaring_and<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type, other.handle.type,
                                                     local_res_type);
         return FlexibleRoaringBitmap(ptr, local_res_type, handle.index);
+    }
+
+    FlexibleRoaringBitmap& operator&=(const FlexibleRoaringBitmap& other) noexcept {
+        if (!is_inited() || !other.is_inited()) {
+            clear();
+            return *this;
+        }
+        // Both containers
+        if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
+            ContainersSized::andi(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
+            return *this;
+        }
+
+        // One of them are containers:
+        if (handle.type == CTy::Containers) {  // the other is not containers
+            auto containers = castToContainers(handle.ptr);
+            const ContainerHandle& rhs = other.handle;
+            const ContainerHandle& lhs = containers->containers[containers->lower_bound(rhs.index)];
+            if (lhs.index != rhs.index) {
+                clear();
+                return *this;
+            }
+
+            CTy local_res_type;
+            auto ptr = froaring_andi<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, local_res_type);
+            clear();
+            this->handle = ContainerHandle(ptr, local_res_type, lhs.index);
+            return *this;
+        }
+        if (other.handle.type == CTy::Containers) {  // this is not containers
+            auto containers = castToContainers(handle.ptr);
+            const ContainerHandle& rhs = handle;
+            const ContainerHandle& lhs = containers->containers[containers->lower_bound(rhs.index)];
+            if (lhs.index != rhs.index) {
+                clear();
+                return *this;
+            }
+            CTy local_res_type;
+            auto ptr = froaring_andi<WordType, DataBits>(lhs.ptr, rhs.ptr, lhs.type, rhs.type, local_res_type);
+            clear();
+            this->handle = ContainerHandle(ptr, local_res_type, lhs.index);
+            return *this;
+        }
+        // Both are single container:
+        if (handle.index != other.handle.index) {
+            clear();
+            return *this;
+        }
+        CTy local_res_type;
+        auto ptr = froaring_andi<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type, other.handle.type,
+                                                     local_res_type);
+        // new container has been created, and the old one should be released by the caller
+        // (i.e., this function)
+        if (ptr != handle.ptr) {
+            release_container<WordType, DataBits>(handle.ptr, handle.type);
+        } else if (container_empty<WordType, DataBits>(ptr, local_res_type)) {
+            release_container<WordType, DataBits>(ptr, local_res_type);
+            handle.ptr = nullptr;
+            handle.index = UNKNOWN_INDEX;
+            return *this;
+        }
+        handle.ptr = ptr;
+        handle.type = local_res_type;
+        return *this;
     }
 
     /// @brief Called when the current container exceeds the block size:

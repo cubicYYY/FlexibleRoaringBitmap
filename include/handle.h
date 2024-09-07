@@ -1,12 +1,14 @@
 #pragma once
 
 #include "prelude.h"
+#include "utils.h"
 
 namespace froaring {
 /// @brief to hold container data: pointer, type, and index
 /// No copying is allowed: a handle is a unique pointer in essence.
 template <typename IndexType>
 struct ContainerHandle {
+public:
     ContainerHandle() = default;
     ContainerHandle(ContainerHandle&&) = default;
     ContainerHandle& operator=(ContainerHandle&&) = default;
@@ -15,7 +17,7 @@ struct ContainerHandle {
     ContainerHandle& operator=(const ContainerHandle&) = delete;
 
     ContainerHandle(froaring_container_t* ptr, ContainerType type, IndexType index)
-        : ptr(ptr), type(type), index(index) {}
+        : ptr(ptr), type(type), index(index){};
     ~ContainerHandle() = default;
 
 public:

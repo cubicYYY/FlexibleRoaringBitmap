@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstring>
+
 #include "handle.h"
 #include "prelude.h"
 #include "transform.h"
+#include "utils.h"
 
 namespace froaring {
 
@@ -31,8 +34,8 @@ public:
 
 public:
     BinsearchIndex(SizeType capacity = CONTAINERS_INIT_CAPACITY, SizeType size = 0)
-        : capacity(capacity),
-          size(size),
+        : size(size),
+          capacity(capacity),
           containers(static_cast<ContainerHandle*>(malloc(capacity * sizeof(ContainerHandle)))) {
         assert(containers && "Failed to allocate memory for containers");
     }
@@ -152,7 +155,7 @@ public:
                 // Transform into a bitmap container if it gets bigger
                 if (array_ptr->size >= ArraySized::ArrayToBitmapCountThreshold) {
                     auto new_bitmap = froaring_array_to_bitmap<WordType, DataBits>(array_ptr);
-                    delete containers[pos].ptr;
+                    release_container(array_ptr);
                     containers[pos].ptr = new_bitmap;
                     containers[pos].type = CTy::Bitmap;
                 }
@@ -198,7 +201,7 @@ public:
                 // Transform into a bitmap container if it gets bigger
                 if (array_ptr->size >= ArraySized::ArrayToBitmapCountThreshold) {
                     auto new_bitmap = froaring_array_to_bitmap<WordType, DataBits>(array_ptr);
-                    delete containers[pos].ptr;
+                    release_container(array_ptr);
                     containers[pos].ptr = new_bitmap;
                     containers[pos].type = CTy::Bitmap;
                 }
@@ -213,8 +216,8 @@ public:
     }
 
     // Calculate the total cardinality of all containers
-    size_t cardinality() const {
-        size_t total = 0;
+    SizeType cardinality() const {
+        SizeType total = 0;
         for (SizeType i = 0; i < size; ++i) {
             auto& entry = containers[i];
             switch (entry.type) {
@@ -250,37 +253,32 @@ public:
         // Now we found the corresponding container
         switch (entry.type) {
             case CTy::RLE: {
-                static_cast<RLEContainer<WordType, DataBits>*>(entry.ptr)->reset(data);
-                if (static_cast<RLEContainer<WordType, DataBits>*>(entry.ptr)->run_count == 0) {
-                    delete entry.ptr;
-                    if (size > 1) {
-                        std::memmove(&containers[pos], &containers[pos + 1],
-                                     (size - pos - 1) * sizeof(ContainerHandle));
-                    }
+                auto rle_ptr = static_cast<RLEContainer<WordType, DataBits>*>(entry.ptr);
+                rle_ptr->reset(data);
+                if (rle_ptr->run_count == 0) {
+                    release_container(rle_ptr);
+                    std::memmove(&containers[pos], &containers[pos + 1], (size - pos - 1) * sizeof(ContainerHandle));
+
                     size--;
                 }
                 break;
             }
             case CTy::Array: {
-                static_cast<ArrayContainer<WordType, DataBits>*>(entry.ptr)->reset(data);
-                if (static_cast<ArrayContainer<WordType, DataBits>*>(entry.ptr)->size == 0) {
-                    delete entry.ptr;
-                    if (size > 1) {
-                        std::memmove(&containers[pos], &containers[pos + 1],
-                                     (size - pos - 1) * sizeof(ContainerHandle));
-                    }
+                auto array_ptr = static_cast<ArrayContainer<WordType, DataBits>*>(entry.ptr);
+                array_ptr->reset(data);
+                if (array_ptr->cardinality() == 0) {
+                    release_container(array_ptr);
+                    std::memmove(&containers[pos], &containers[pos + 1], (size - pos - 1) * sizeof(ContainerHandle));
                     size--;
                 }
                 break;
             }
             case CTy::Bitmap: {
-                static_cast<BitmapContainer<WordType, DataBits>*>(entry.ptr)->reset(data);
-                if (static_cast<BitmapContainer<WordType, DataBits>*>(entry.ptr)->cardinality() == 0) {
-                    delete entry.ptr;
-                    if (size > 1) {
-                        std::memmove(&containers[pos], &containers[pos + 1],
-                                     (size - pos - 1) * sizeof(ContainerHandle));
-                    }
+                auto bitmap_ptr = static_cast<BitmapContainer<WordType, DataBits>*>(entry.ptr);
+                bitmap_ptr->reset(data);
+                if (bitmap_ptr->cardinality() == 0) {
+                    release_container(bitmap_ptr);
+                    std::memmove(&containers[pos], &containers[pos + 1], (size - pos - 1) * sizeof(ContainerHandle));
                     size--;
                 }
                 break;
@@ -309,36 +307,40 @@ public:
     }
     // Release all containers
     ~BinsearchIndex() {
+        std::cout << "~Index" << (void*)this << std::endl;
+
         for (SizeType i = 0; i < size; ++i) {
-            switch (containers[i].type) {
-                case CTy::Array:
-                    static_cast<ArrayContainer<WordType, DataBits>*>(containers[i].ptr)->~ArrayContainer();
-                    break;
-                case CTy::Bitmap:
-                    static_cast<BitmapContainer<WordType, DataBits>*>(containers[i].ptr)->~BitmapContainer();
-                    break;
-                case CTy::RLE:
-                    static_cast<RLEContainer<WordType, DataBits>*>(containers[i].ptr)->~RLEContainer();
-                    break;
-                default:
-                    FROARING_UNREACHABLE
-            }
-            delete containers[i].ptr;
+            std::cout << "Deleting c[" << i << "]..." << std::endl;
+            std::cout << "Index=" << int(containers[i].index) << std::endl;
+            release_container<WordType, DataBits>(containers[i].ptr, containers[i].type);
+            std::cout << "Deleted c[" << i << "]." << std::endl;
         }
+        std::cout << "freeing cs..." << (void*)containers << std::endl;
         free(containers);
     }
 
     static BinsearchIndex<WordType, IndexBits, DataBits>* and_(const BinsearchIndex<WordType, IndexBits, DataBits>* a,
                                                                const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
         auto result = new BinsearchIndex<WordType, IndexBits, DataBits>(a->capacity, 0);
-        size_t i = 0, j = 0;
-        size_t new_container_counts = 0;
-        while (i < a->size && j < b->size) {
-            if (a->containers[i].index < b->containers[j].index) {
+        SizeType i = 0, j = 0;
+        SizeType new_container_counts = 0;
+        while (true) {
+            while (a->containers[i].index < b->containers[j].index) {
+            SKIP_FIRST_COMPARE:
                 i++;
-            } else if (a->containers[i].index > b->containers[j].index) {
+                if (i >= a->size) {
+                    result->size = new_container_counts;
+                    return result;
+                }
+            }
+            while (a->containers[i].index > b->containers[j].index) {
                 j++;
-            } else {
+                if (j >= b->size) {
+                    result->size = new_container_counts;
+                    return result;
+                }
+            }
+            if (a->containers[i].index == b->containers[j].index) {
                 CTy local_res_type;
                 auto res =
                     froaring_and<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr, a->containers[i].type,
@@ -347,23 +349,77 @@ public:
                     ContainerHandle(res, local_res_type, a->containers[i].index);
                 i++;
                 j++;
+                if (i == a->size || j == b->size) {
+                    result->size = new_container_counts;
+                    return result;
+                }
+            } else {
+                goto SKIP_FIRST_COMPARE;
             }
         }
-        result->size = new_container_counts;
-        return result;
+        FROARING_UNREACHABLE
     }
+
+    static void andi(BinsearchIndex<WordType, IndexBits, DataBits>* a,
+                     const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
+        SizeType i = 0, j = 0;
+        SizeType new_container_counts = 0;
+        while (i < a->size && j < b->size) {
+            auto keya = a->containers[i].index;
+            auto keyb = b->containers[j].index;
+            if (keya == keyb) {
+                CTy local_res_type;
+                auto new_container =
+                    froaring_andi<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr, a->containers[i].type,
+                                                      b->containers[j].type, local_res_type);
+                if (new_container != a->containers[i].ptr) {  // New container is created: release the old one
+                    release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+                } else if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
+                    release_container<WordType, DataBits>(new_container, local_res_type);
+                } else {
+                    a->containers[new_container_counts].ptr = new_container;
+                    a->containers[new_container_counts].type = local_res_type;
+                    new_container_counts++;
+                }
+                ++i;
+                ++j;
+            } else if (keya < keyb) {
+                // TODO: use Gallop search
+                i = a->advanceAndReleaseUntil(keyb, i);
+            } else {
+                j = b->advanceAndReleaseUntil(keya, j);
+            }
+        }
+        // Release the rest of the containers
+        for (auto pos = new_container_counts; pos < a->size; ++pos) {
+            release_container<WordType, DataBits>(a->containers[pos].ptr, a->containers[pos].type);
+            a->containers[pos].ptr = nullptr;
+            pos++;
+        }
+        a->size = new_container_counts;
+    }
+
+    SizeType advanceAndReleaseUntil(IndexType key, SizeType pos) const {
+        while (pos < size && containers[pos].index < key) {
+            release_container<WordType, DataBits>(containers[pos].ptr, containers[pos].type);
+            containers[pos].ptr = nullptr;
+            pos++;
+        }
+        return pos;
+    }
+
     static bool equals(const BinsearchIndex<WordType, IndexBits, DataBits>* a,
                        const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
         if (a->size != b->size) {
             return false;
         }
 
-        for (size_t i = 0; i < a->size; ++i) {  // quick check
+        for (SizeType i = 0; i < a->size; ++i) {  // quick check
             if (a->containers[i].index != b->containers[i].index) {
                 return false;
             }
         }
-        for (size_t i = 0; i < a->size; ++i) {
+        for (SizeType i = 0; i < a->size; ++i) {
             auto res = froaring_equal<WordType, DataBits>(a->containers[i].ptr, b->containers[i].ptr,
                                                           a->containers[i].type, b->containers[i].type);
             if (!res) {

@@ -10,7 +10,7 @@ using CTy = froaring::ContainerType;
 
 template <typename WordType, size_t DataBits>
 bool froaring_equal_bb(const BitmapContainer<WordType, DataBits>* a, const BitmapContainer<WordType, DataBits>* b) {
-    for (auto i = 0; i < a->WordsCount; ++i) {
+    for (size_t i = 0; i < a->WordsCount; ++i) {
         if (a->words[i] != b->words[i]) return false;
     }
     return true;
@@ -63,7 +63,7 @@ bool froaring_equal_ba(const BitmapContainer<WordType, DataBits>* a, const Array
     }
 
     typename BitmapContainer<WordType, DataBits>::SizeType pos = 0;
-    for (auto i = 0; i < a->WordsCount; ++i) {
+    for (size_t i = 0; i < a->WordsCount; ++i) {
         WordType w = a->words[i];
         while (w != 0) {
             if (pos >= b->cardinality()) {

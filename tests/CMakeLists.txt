@@ -3,20 +3,23 @@ find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-# Testing files
-add_executable(ArrayContainerTest test_array_container.cpp)
-target_link_libraries(ArrayContainerTest ${GTEST_LIBRARIES} pthread)
-add_executable(BitmapContainerTest test_bitmap_container.cpp)
-target_link_libraries(BitmapContainerTest ${GTEST_LIBRARIES} pthread)
-add_executable(RLEContainerTest test_rle_container.cpp)
-target_link_libraries(RLEContainerTest ${GTEST_LIBRARIES} pthread)
-add_executable(IntegrationTest integration_test.cpp)
-target_link_libraries(IntegrationTest ${GTEST_LIBRARIES} pthread)
+# Function to add test executable and link libraries
+function(add_gtest target source)
+    add_executable(${target} ${source})
+    target_link_libraries(${target} ${GTEST_LIBRARIES} pthread)
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+# Get all .cpp files in the current directory
+file(GLOB TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+
+# Loop through each .cpp file and create an executable target and test
+foreach(TEST_FILE ${TEST_FILES})
+    # Get the filename without the extension
+    get_filename_component(TARGET_NAME ${TEST_FILE} NAME_WE)
+    # Add the test executable and link libraries
+    add_gtest(${TARGET_NAME} ${TEST_FILE})
+endforeach()
 
 # Enable testing
 enable_testing()
-
-add_test(NAME ArrayContainerTest COMMAND ArrayContainerTest)
-add_test(NAME BitmapContainerTest COMMAND BitmapContainerTest)
-add_test(NAME RLEContainerTest COMMAND RLEContainerTest)
-add_test(NAME IntegrationTest COMMAND IntegrationTest)

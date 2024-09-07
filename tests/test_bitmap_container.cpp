@@ -8,6 +8,7 @@ protected:
     BitmapContainer<uint64_t, 8>* container;
 
     void SetUp() override { container = new BitmapContainer<uint64_t, 8>(); }
+    void TearDown() override { delete container; }
 };
 
 TEST_F(BitmapContainerTest, TestSetAndTest) {
@@ -69,6 +70,38 @@ TEST_F(BitmapContainerTest, ContainsRangeTest) {
     EXPECT_FALSE(container->containesRange(62, 68));
 
     EXPECT_EQ(container->cardinality(), 12);
+}
+
+TEST_F(BitmapContainerTest, NonPowerOf2SizeBitmap) {
+    auto* container = new BitmapContainer<uint64_t, 10>();
+    container->set(909);
+    container->set(910);
+    container->set(911);
+    container->set(912);
+    container->set(913);
+
+    container->set(1023);
+
+    container->set(962);
+    container->set(963);
+    container->set(964);
+    container->set(965);
+    container->set(966);
+    container->set(967);
+    container->set(968);
+    container->reset(967);
+    EXPECT_EQ(container->IndexInsideWordMask, 0x3F);  // uint64_t, 64 bits = 2^6 bits, (111111)2=0x3F
+    container->debug_print();
+    EXPECT_TRUE(container->test(1023));
+    EXPECT_TRUE(container->containesRange(909, 913));
+    EXPECT_FALSE(container->containesRange(909, 914));
+    EXPECT_FALSE(container->containesRange(908, 913));
+    EXPECT_TRUE(container->containesRange(962, 966));
+    EXPECT_TRUE(container->containesRange(968, 968));
+    EXPECT_FALSE(container->containesRange(962, 968));
+
+    EXPECT_EQ(container->cardinality(), 12);
+    delete container;
 }
 
 }  // namespace froaring

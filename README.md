@@ -38,7 +38,8 @@ mkdir build
 cd ./build
 cmake ..
 make -j
-# ctest # if you wish
+# ctest # if you wish, or even:
+# valgrind --leak-check=full ./integration_test
 
 # Run examples
 ./example

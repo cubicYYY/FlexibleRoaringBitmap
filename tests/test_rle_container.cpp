@@ -10,6 +10,7 @@ protected:
     RLESized* container;
 
     void SetUp() override { container = new RLESized(); }
+    void TearDown() override { delete container; }
 };
 
 TEST_F(RLEContainerTest, SetSingleValue) {

@@ -10,10 +10,6 @@
 namespace froaring {
 template <typename WordType, size_t DataBits>
 class BitmapContainer : public froaring_container_t {
-    static_assert(std::popcount(DataBits) == 1,
-                  "DataBits must be a power of 2. This restriction is for efficient bit operations and may be removed "
-                  "in the future.");
-
 public:
     static constexpr size_t BitsPerWord = 8 * sizeof(WordType);
     static constexpr size_t TotalBits = (1 << DataBits);
@@ -23,13 +19,13 @@ public:
     using SizeType = froaring::can_fit_t<DataBits + 1>;
     static constexpr WordType IndexInsideWordMask = (1ULL << cexpr_log2(BitsPerWord)) - 1;
 
+    static_assert(WordsCount * BitsPerWord == TotalBits, "Size of WordType must divides DataBits");
+
 public:
     BitmapContainer() { memset(words, 0, sizeof(words)); }
 
     BitmapContainer(const BitmapContainer& other) { std::memcpy(words, other.words, WordsCount * sizeof(WordType)); }
     BitmapContainer& operator=(const BitmapContainer&) = delete;
-
-    static void destroy(BitmapContainer* obj) { delete (obj); }
 
     void debug_print() const {
         for (size_t i = 0; i < WordsCount; ++i) {

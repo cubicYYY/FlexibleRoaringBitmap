@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <cassert>
+#include <cstdint>
 #include <new>
 
 #define INIT_FLAG 0x1
@@ -17,7 +18,7 @@ const int ARRAY_CONTAINER_INIT_CAPACITY = 4;
 const int RLE_CONTAINER_INIT_CAPACITY = 4;
 const int CONTAINERS_INIT_CAPACITY = 16;
 /// so we will use linear scan instead of bin-search for small containers
-const size_t MINIMAL_SIZE_TO_BINSEARCH = 8;
+const std::size_t MINIMAL_SIZE_TO_BINSEARCH = 8;
 
 // Markers
 struct froaring_container_t {};
@@ -25,23 +26,8 @@ struct froaring_indices_t : public froaring_container_t {};
 using froaring_container_t = struct froaring_container_t;
 using froaring_indices_t = struct froaring_indices_t;
 
-template <typename Derived>
-class Destroyable {
-public:
-    void destroy() {
-        static_cast<Derived*>(this)->~Derived();
-        free(static_cast<void*>(this));
-    }
-
-protected:
-    Destroyable() = default;
-    Destroyable(const Destroyable&) = delete;
-    Destroyable& operator=(const Destroyable&) = delete;
-    ~Destroyable() = default;
-};
-
 // Helper functions
-template <size_t Bits>
+template <std::size_t Bits>
 struct can_fit {
     // Define an error type that triggers a static assertion when used
     struct InvalidBigType {
@@ -61,12 +47,12 @@ struct can_fit {
 };
 
 // Define a convenient alias for IndexType
-template <size_t Bits>
+template <std::size_t Bits>
 using can_fit_t = typename can_fit<Bits>::type;
 
 // Separeate the index bits ("high" bits) and data bits (low bits) from a value
 // TODO: Need unit test
-template <size_t IndexBits, size_t DataBits>
+template <std::size_t IndexBits, std::size_t DataBits>
 void num2index_n_data(can_fit_t<IndexBits + DataBits> value, can_fit_t<IndexBits>& index, can_fit_t<DataBits>& data) {
     static_assert(IndexBits + DataBits <= sizeof(value) * 8,
                   "IndexBits + DataBits exceeds the type size of the value.");

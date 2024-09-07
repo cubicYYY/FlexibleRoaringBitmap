@@ -34,7 +34,10 @@ public:
         assert(runs && "Failed to allocate memory for RLEContainer");
     }
 
-    ~RLEContainer() { free(runs); }
+    ~RLEContainer() {
+        std::cout << "~RLE" << (void*)this << std::endl;
+        free(runs);
+    }
 
     RLEContainer(const RLEContainer&) = delete;
     RLEContainer& operator=(const RLEContainer&) = delete;
@@ -67,7 +70,6 @@ public:
         if (!run_count) return;
         auto pos = lower_bound(num);
         if (pos == run_count || runs[pos].start > num || runs[pos].end < num) return;
-        auto old_end = runs[pos].end;
         if (runs[pos].start == num && runs[pos].end == num) {  // run is a single element, just remove it
             if (pos < run_count) memmove(&runs[pos], &runs[pos + 1], (run_count - pos - 1) * sizeof(RunPair));
             --run_count;
