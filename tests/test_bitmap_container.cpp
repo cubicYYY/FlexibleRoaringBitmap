@@ -104,6 +104,24 @@ TEST_F(BitmapContainerTest, NonPowerOf2SizeBitmap) {
     delete container;
 }
 
+TEST_F(BitmapContainerTest, ResetRange) {
+    auto* container = new BitmapContainer<uint64_t, 10>();
+    container->set(909);
+    container->set(910);
+    container->set(911);
+    container->set(912);
+    container->set(913);
+
+    container->reset_range(910, 912);
+    EXPECT_TRUE(container->test(909));
+    EXPECT_FALSE(container->test(910));
+    EXPECT_FALSE(container->test(911));
+    EXPECT_FALSE(container->test(912));
+    EXPECT_TRUE(container->test(913));
+
+    delete container;
+}
+
 }  // namespace froaring
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

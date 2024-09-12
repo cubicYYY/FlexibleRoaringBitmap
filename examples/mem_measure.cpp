@@ -1,7 +1,7 @@
-#include <iostream>
-#include <vector>
-#include <thread>
 #include <chrono>
+#include <iostream>
+#include <thread>
+#include <vector>
 
 #include "froaring.h"
 

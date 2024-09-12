@@ -7,21 +7,23 @@ namespace froaring {
 /// @brief to hold container data: pointer, type, and index
 /// No copying is allowed: a handle is a unique pointer in essence.
 template <typename IndexType>
-struct ContainerHandle {
+struct ContainerHandleS {
 public:
-    ContainerHandle() = default;
-    ContainerHandle(ContainerHandle&&) = default;
-    ContainerHandle& operator=(ContainerHandle&&) = default;
+    ContainerHandleS() = default;
+    ContainerHandleS(ContainerHandleS&&) = default;
+    ContainerHandleS& operator=(ContainerHandleS&&) = default;
 
-    ContainerHandle(const ContainerHandle&) = delete;
-    ContainerHandle& operator=(const ContainerHandle&) = delete;
+    ContainerHandleS(const ContainerHandleS&) = delete;
+    ContainerHandleS& operator=(const ContainerHandleS&) = delete;
 
-    ContainerHandle(froaring_container_t* ptr, ContainerType type, IndexType index)
+    ContainerHandleS(froaring_container_t* ptr, ContainerType type, IndexType index)
         : ptr(ptr), type(type), index(index){};
-    ~ContainerHandle() = default;
+    ~ContainerHandleS() = default;
 
 public:
-    /// Pointer to the container (could be RLE, Array, or Bitmap)
+    /// Pointer to the container (could be RLE, Array, Bitmap or other types)
+    /// "Containers" are considered as a special type of container, which refers to a custom type of "index layer".
+    /// You can use different "indexes layer" to manage real containers.
     /// Type is erased, handle carefully!
     froaring_container_t* ptr = nullptr;
     froaring::ContainerType type = ContainerType::Array;  // Type of container (RLE, Array, Bitmap, ...)
@@ -29,5 +31,5 @@ public:
 };
 
 template <typename IndexType>
-using ContainerHandle = struct ContainerHandle;
+using ContainerHandle = struct ContainerHandleS<IndexType>;
 }  // namespace froaring

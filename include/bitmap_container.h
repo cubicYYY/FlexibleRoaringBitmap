@@ -15,16 +15,18 @@ public:
     static constexpr size_t TotalBits = (1 << DataBits);
     static constexpr size_t WordsCount = (TotalBits + BitsPerWord - 1) / BitsPerWord;  // ceiling
     using NumType = froaring::can_fit_t<DataBits>;
-    using IndexType = froaring::can_fit_t<WordsCount>;
+    using IndexType = froaring::can_fit_t<cexpr_log2(WordsCount)>;  // FIXME: weird...
     using SizeType = froaring::can_fit_t<DataBits + 1>;
     static constexpr WordType IndexInsideWordMask = (1ULL << cexpr_log2(BitsPerWord)) - 1;
 
     static_assert(WordsCount * BitsPerWord == TotalBits, "Size of WordType must divides DataBits");
 
 public:
-    BitmapContainer() { memset(words, 0, sizeof(words)); }
+    explicit BitmapContainer() { memset(words, 0, sizeof(words)); }
 
-    BitmapContainer(const BitmapContainer& other) { std::memcpy(words, other.words, WordsCount * sizeof(WordType)); }
+    explicit BitmapContainer(const BitmapContainer& other) {
+        std::memcpy(words, other.words, WordsCount * sizeof(WordType));
+    }
     BitmapContainer& operator=(const BitmapContainer&) = delete;
 
     void debug_print() const {
@@ -45,6 +47,31 @@ public:
 
     void set(NumType index) { words[index / BitsPerWord] |= ((WordType)1 << (index % BitsPerWord)); }
 
+    void set_range(NumType start, NumType end) {
+        if (start >= end) {
+            return;
+        }
+        const IndexType start_word = start / BitsPerWord;
+        const IndexType end_word = end / BitsPerWord;
+        if (end_word >= WordsCount || start_word >= WordsCount) {
+            return;
+        }
+        // All "1" from `start` to MSB
+        const WordType first_mask = ~((1ULL << (start & IndexInsideWordMask)) - 1);
+        // All "1" from LSB to `end`
+        const WordType last_mask =
+            ((1ULL << ((end & IndexInsideWordMask))) - 1) ^ (1ULL << ((end & IndexInsideWordMask)));
+
+        if (start_word == end_word) {
+            words[end_word] |= (first_mask & last_mask);
+        }
+
+        words[start_word] |= first_mask;
+        words[end_word] |= last_mask;
+
+        std::memset(&words[start_word + 1], 0xFF, (end_word - start_word - 1) * sizeof(NumType));
+    }
+
     bool test(NumType index) const { return words[index / BitsPerWord] & ((WordType)1 << (index % BitsPerWord)); }
 
     bool test_and_set(NumType index) {
@@ -56,6 +83,7 @@ public:
 
     void reset(NumType index) { words[index / BitsPerWord] &= ~((WordType)1 << (index % BitsPerWord)); }
 
+    /// @brief Reset [start, end], inclusive
     void reset_range(NumType start, NumType end) {
         if (start >= end) {
             return;
@@ -66,9 +94,11 @@ public:
             return;
         }
         // All "0" from `start` to MSB
-        const WordType first_mask = (1ULL << (start & IndexInsideWordMask)) - 1;
+        const WordType first_mask = ((1ULL << (start & IndexInsideWordMask)) - 1);
+        ;
         // All "0" from LSB to `end`
-        const WordType last_mask = ~((1ULL << ((end & IndexInsideWordMask))) - 1);
+        const WordType last_mask =
+            (~((1ULL << ((end & IndexInsideWordMask))) - 1)) ^ (1ULL << ((end & IndexInsideWordMask)));
 
         if (start_word == end_word) {
             words[start_word] &= (first_mask | last_mask);
@@ -78,16 +108,14 @@ public:
         words[start_word] &= first_mask;
         words[end_word] &= last_mask;
 
-        for (IndexType i = start_word + 1; i < end_word; ++i) {
-            words[i] = 0;
-        }
+        std::memset(&words[start_word + 1], 0, (end_word - start_word - 1) * sizeof(NumType));
     }
 
     /// @brief Check if the range is fully contained in the container.
     /// @param start inclusive.
     /// @param end inclusive.
     /// @return If [start, end] is fully contained in the container.
-    bool containesRange(IndexType start, IndexType end) const {
+    bool containesRange(NumType start, NumType end) const {
         if (start >= end) {
             return true;
         }
@@ -104,20 +132,16 @@ public:
 
         if (start_word == end_word) {
             return ((words[end_word] & first_mask & last_mask) == (first_mask & last_mask));
-            std::cout << "FAIL=3";
         }
         if ((words[start_word] & first_mask) != first_mask) {
             return false;
-            std::cout << "FAIL=1";
         }
         if ((words[end_word] & last_mask) != last_mask) {
             return false;
-            std::cout << "FAIL=2";
         }
 
-        for (IndexType i = start_word + 1; i < end_word; ++i) {
+        for (size_t i = start_word + 1; i < end_word; ++i) {
             if (~words[i] != 0) {
-                std::cout << "FAIL=1";
                 return false;
             }
         }
@@ -125,7 +149,7 @@ public:
         return true;
     }
 
-    void intersect_range(IndexType start, IndexType end) {
+    void intersect_range(NumType start, NumType end) {
         if (start >= end) {
             clear();
             return;

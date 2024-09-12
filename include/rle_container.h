@@ -27,7 +27,7 @@ public:
     static constexpr size_t RleToBitmapRunThreshold = ContainerCapacity / (DataBits * 2);
 
 public:
-    RLEContainer(SizeType capacity = RLE_CONTAINER_INIT_CAPACITY, SizeType run_count = 0)
+    explicit RLEContainer(SizeType capacity = RLE_CONTAINER_INIT_CAPACITY, SizeType run_count = 0)
         : capacity(std::max(capacity, run_count)),
           run_count(run_count),
           runs(static_cast<RunPair*>(malloc(capacity * sizeof(RunPair)))) {
@@ -39,7 +39,13 @@ public:
         free(runs);
     }
 
-    RLEContainer(const RLEContainer&) = delete;
+    explicit RLEContainer(const RLEContainer& other) {
+        auto other_size = other.runsCount();
+        expand_to(other_size);
+        std::memcpy(this->runs, other.runs, sizeof(RunPair) * other_size);
+        run_count = other_size;
+    }
+
     RLEContainer& operator=(const RLEContainer&) = delete;
 
     void debug_print() const {
@@ -133,12 +139,13 @@ private:
         return left;
     }
 
-    void expand() {
-        capacity *= 2;
+    void expand() { expand_to(this->capacity * 2); }
 
-        void* new_memory = realloc(runs, capacity * sizeof(RunPair));
+    void expand_to(SizeType new_cap) {
+        void* new_memory = realloc(runs, new_cap * sizeof(RunPair));
         assert(new_memory && "Failed to reallocate memory for ArrayContainer");
         runs = static_cast<RunPair*>(new_memory);
+        this->capacity = new_cap;
     }
 
     void set_raw(IndexOrNumType pos, IndexOrNumType num) {

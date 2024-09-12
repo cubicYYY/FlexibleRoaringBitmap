@@ -194,7 +194,8 @@ froaring_container_t* froaring_and_br(const BitmapContainer<WordType, DataBits>*
     result_type = CTy::Bitmap;
 
     // if the guess is wrong...
-    // TODO: Convert it back to the array, or not?
+    // TODO: Should we convert it back to an array?
+
     return result;
 }
 

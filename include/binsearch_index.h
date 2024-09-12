@@ -3,8 +3,8 @@
 #include <cstring>
 
 #include "handle.h"
+#include "mix_ops.h"
 #include "prelude.h"
-#include "transform.h"
 #include "utils.h"
 
 namespace froaring {
@@ -33,12 +33,26 @@ public:
     using ContainerHandle = froaring::ContainerHandle<IndexType>;
 
 public:
-    BinsearchIndex(SizeType capacity = CONTAINERS_INIT_CAPACITY, SizeType size = 0)
+    explicit BinsearchIndex(SizeType capacity = CONTAINERS_INIT_CAPACITY, SizeType size = 0)
         : size(size),
           capacity(capacity),
           containers(static_cast<ContainerHandle*>(malloc(capacity * sizeof(ContainerHandle)))) {
         assert(containers && "Failed to allocate memory for containers");
     }
+
+    explicit BinsearchIndex(const BinsearchIndex& other) {
+        expand_to(other.size);
+        for (SizeType i = 0; i < other.size; ++i) {
+            containers[i].index = other.containers[i].index;
+            containers[i].type = other.containers[i].type;
+            containers[i].ptr =
+                froaring_duplicate_container<WordType, DataBits>(other.containers[i].ptr, other.containers[i].type);
+        }
+        size = other.size;
+    }
+
+    explicit BinsearchIndex(BinsearchIndex&& other)
+        : size(std::move(other.size)), capacity(std::move(other.capacity)), containers(std::move(other.containers)) {}
 
     void debug_print() const {
         for (SizeType i = 0; i < size; ++i) {
@@ -70,8 +84,7 @@ public:
         }
     }
 
-    /// Return the entry position if found, otherwise the iterator points to the
-    /// lower bound (to be inserted at).
+    /// Return the entry position if found. Otherwise the first position that is greater than `index`.
     ///
     SizeType lower_bound(IndexType index) const {
         SizeType left = 0;
@@ -86,17 +99,6 @@ public:
             }
         }
         return left;
-    }
-
-    // Add a new container with a given index
-    void addContainer(froaring_container_t* ptr, IndexType index, CTy type = CTy::Array) {
-        assert(index < (1 << IndexBits) && "Container index exceeds the allowed bits.");
-
-        ContainerHandle entry;
-        entry.ptr = ptr;
-        entry.type = type;
-        entry.index = index;
-        containers.push_back(entry);
     }
 
     // Check if `value` is present in the container
@@ -132,6 +134,7 @@ public:
 
         // Not found, insert a new container:
         if (pos == size || containers[pos].index != index) {
+            std::cout << "New ctn! pos=" << pos << " index=" << index << std::endl;
             if (size == capacity) {
                 expand();
             }
@@ -140,6 +143,7 @@ public:
             array_ptr->vals[0] = data;
             containers[pos] = ContainerHandle(array_ptr, CTy::Array, index);
             size++;
+            debug_print();
             return;
         }
 
@@ -289,19 +293,7 @@ public:
     }
     void clear() {
         for (SizeType i = 0; i < size; ++i) {
-            switch (containers[i].type) {
-                case CTy::Array:
-                    static_cast<ArrayContainer<WordType, DataBits>*>(containers[i].ptr)->clear();
-                    break;
-                case CTy::Bitmap:
-                    static_cast<BitmapContainer<WordType, DataBits>*>(containers[i].ptr)->clear();
-                    break;
-                case CTy::RLE:
-                    static_cast<RLEContainer<WordType, DataBits>*>(containers[i].ptr)->clear();
-                    break;
-                default:
-                    FROARING_UNREACHABLE
-            }
+            release_container<WordType, DataBits>(containers[i].ptr, containers[i].type);
         }
         size = 0;
     }
@@ -360,6 +352,87 @@ public:
         FROARING_UNREACHABLE
     }
 
+    static BinsearchIndex<WordType, IndexBits, DataBits>* or_(const BinsearchIndex<WordType, IndexBits, DataBits>* a,
+                                                              const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
+        auto result = new BinsearchIndex<WordType, IndexBits, DataBits>(a->capacity, 0);
+        SizeType i = 0, j = 0;
+        SizeType new_container_counts = 0;
+        while (true) {
+            while (a->containers[i].index < b->containers[j].index) {
+            SKIP_FIRST_COMPARE:
+                froaring_container_t* dup =
+                    froaring_duplicate_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+                result->containers[new_container_counts++] =
+                    ContainerHandle(dup, a->containers[i].type, a->containers[i].index);
+                i++;
+                if (i >= a->size) {
+                    while (j < b->size) {
+                        froaring_container_t* dup = froaring_duplicate_container<WordType, DataBits>(
+                            b->containers[j].ptr, b->containers[j].type);
+                        result->containers[new_container_counts++] =
+                            ContainerHandle(dup, b->containers[j].type, b->containers[j].index);
+                        j++;
+                    }
+                    result->size = new_container_counts;
+                    return result;
+                }
+            }
+            while (a->containers[i].index > b->containers[j].index) {
+                froaring_container_t* dup =
+                    froaring_duplicate_container<WordType, DataBits>(b->containers[j].ptr, b->containers[j].type);
+                result->containers[new_container_counts++] =
+                    ContainerHandle(dup, b->containers[j].type, b->containers[j].index);
+                j++;
+                if (j >= b->size) {
+                    while (i < a->size) {
+                        froaring_container_t* dup = froaring_duplicate_container<WordType, DataBits>(
+                            a->containers[i].ptr, a->containers[i].type);
+                        result->containers[new_container_counts++] =
+                            ContainerHandle(dup, a->containers[i].type, a->containers[i].index);
+                        i++;
+                    }
+                    result->size = new_container_counts;
+                    return result;
+                }
+            }
+            if (a->containers[i].index == b->containers[j].index) {
+                CTy local_res_type;
+                auto res =
+                    froaring_or<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr, a->containers[i].type,
+                                                    b->containers[j].type, local_res_type);
+                result->containers[new_container_counts++] =
+                    ContainerHandle(res, local_res_type, a->containers[i].index);
+                i++;
+                j++;
+                if (i == a->size) {
+                    while (j < b->size) {
+                        froaring_container_t* dup = froaring_duplicate_container<WordType, DataBits>(
+                            b->containers[j].ptr, b->containers[j].type);
+                        result->containers[new_container_counts++] =
+                            ContainerHandle(dup, b->containers[j].type, b->containers[j].index);
+                        j++;
+                    }
+                    result->size = new_container_counts;
+                    return result;
+                }
+                if (j >= b->size) {
+                    while (i < a->size) {
+                        froaring_container_t* dup = froaring_duplicate_container<WordType, DataBits>(
+                            a->containers[i].ptr, a->containers[i].type);
+                        result->containers[new_container_counts++] =
+                            ContainerHandle(dup, a->containers[i].type, a->containers[i].index);
+                        i++;
+                    }
+                    result->size = new_container_counts;
+                    return result;
+                }
+            } else {
+                goto SKIP_FIRST_COMPARE;
+            }
+        }
+        FROARING_UNREACHABLE
+    }
+
     static void andi(BinsearchIndex<WordType, IndexBits, DataBits>* a,
                      const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
         SizeType i = 0, j = 0;
@@ -384,7 +457,6 @@ public:
                 ++i;
                 ++j;
             } else if (keya < keyb) {
-                // TODO: use Gallop search
                 i = a->advanceAndReleaseUntil(keyb, i);
             } else {
                 j = b->advanceAndReleaseUntil(keya, j);
@@ -394,7 +466,6 @@ public:
         for (auto pos = new_container_counts; pos < a->size; ++pos) {
             release_container<WordType, DataBits>(a->containers[pos].ptr, a->containers[pos].type);
             a->containers[pos].ptr = nullptr;
-            pos++;
         }
         a->size = new_container_counts;
     }
@@ -430,10 +501,12 @@ public:
     }
 
 private:
-    void expand() {
-        capacity *= 2;
-        containers = static_cast<ContainerHandle*>(realloc(containers, capacity * sizeof(ContainerHandle)));
+    void expand() { expand_to(2 * capacity); }
+
+    void expand_to(size_t new_cap) {
+        containers = static_cast<ContainerHandle*>(realloc(containers, new_cap * sizeof(ContainerHandle)));
         assert(containers && "Failed to reallocate memory for containers");
+        this->capacity = new_cap;
     }
 
 public:

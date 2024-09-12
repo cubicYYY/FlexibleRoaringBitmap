@@ -17,7 +17,7 @@ froaring_container_t* froaring_and_inplace_bb(BitmapContainer<WordType, DataBits
         a->words[i] &= b->words[i];
     }
     result_type = CTy::Bitmap;
-    
+
     return a;
     // TODO: may transform into array container if the cardinality is low
 }
@@ -66,31 +66,31 @@ froaring_container_t* froaring_and_inplace_aa(ArrayContainer<WordType, DataBits>
 
 /// NOT in-place internally
 template <typename WordType, size_t DataBits>
-froaring_container_t* froaring_and_inplace_rr(RLEContainer<WordType, DataBits>* a, const RLEContainer<WordType, DataBits>* b,
-                                       CTy& result_type) {
+froaring_container_t* froaring_and_inplace_rr(RLEContainer<WordType, DataBits>* a,
+                                              const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     return froaring_and_rr(a, b, result_type);
 }
 
 /// NOT in-place internally
 template <typename WordType, size_t DataBits>
-froaring_container_t* froaring_and_inplace_ar(ArrayContainer<WordType, DataBits>* a, const RLEContainer<WordType, DataBits>* b,
-                                       CTy& result_type) {
+froaring_container_t* froaring_and_inplace_ar(ArrayContainer<WordType, DataBits>* a,
+                                              const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
-    return froaring_and_ar(a, b, result_type); // No need to actually do it in-place
+    return froaring_and_ar(a, b, result_type);  // No need to actually do it in-place
 }
 
 /// NOT in-place internally
 template <typename WordType, size_t DataBits>
-froaring_container_t* froaring_and_inplace_ra(RLEContainer<WordType, DataBits>* a, const ArrayContainer<WordType, DataBits>* b,
-                                       CTy& result_type) {
+froaring_container_t* froaring_and_inplace_ra(RLEContainer<WordType, DataBits>* a,
+                                              const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     return froaring_and_ar(b, a, result_type);
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_inplace_br(BitmapContainer<WordType, DataBits>* a,
-                                       const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
+                                              const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     // TODO: inplace!
     return froaring_and_br(a, b, result_type);
@@ -98,20 +98,20 @@ froaring_container_t* froaring_and_inplace_br(BitmapContainer<WordType, DataBits
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_inplace_rb(RLEContainer<WordType, DataBits>* a,
-                                       const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
+                                              const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     // TODO: inplace!
     return froaring_and_br(b, a, result_type);
 }
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_inplace_ba(BitmapContainer<WordType, DataBits>* a,
-                                       const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
-    return froaring_and_ba(a, b, result_type); // should be Array type
+                                              const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+    return froaring_and_ba(a, b, result_type);  // should be Array type
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_inplace_ab(ArrayContainer<WordType, DataBits>* a,
-                                       const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
+                                              const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
     result_type = CTy::Array;
 
     size_t new_card = 0;
@@ -133,7 +133,8 @@ froaring_container_t* froaring_andi(froaring_container_t* a, const froaring_cont
     using BitmapSized = BitmapContainer<WordType, DataBits>;
     switch (CTYPE_PAIR(ta, tb)) {
         case CTYPE_PAIR(CTy::Bitmap, CTy::Bitmap): {
-            return froaring_and_inplace_bb(static_cast<BitmapSized*>(a), static_cast<const BitmapSized*>(b), result_type);
+            return froaring_and_inplace_bb(static_cast<BitmapSized*>(a), static_cast<const BitmapSized*>(b),
+                                           result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::Array): {
             return froaring_and_inplace_aa(static_cast<ArraySized*>(a), static_cast<const ArraySized*>(b), result_type);
@@ -142,10 +143,12 @@ froaring_container_t* froaring_andi(froaring_container_t* a, const froaring_cont
             return froaring_and_inplace_rr(static_cast<RLESized*>(a), static_cast<const RLESized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Bitmap, CTy::Array): {
-            return froaring_and_inplace_ba(static_cast<BitmapSized*>(a), static_cast<const ArraySized*>(b), result_type);
+            return froaring_and_inplace_ba(static_cast<BitmapSized*>(a), static_cast<const ArraySized*>(b),
+                                           result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::Bitmap): {
-            return froaring_and_inplace_ab(static_cast<ArraySized*>(a), static_cast<const BitmapSized*>(b), result_type);
+            return froaring_and_inplace_ab(static_cast<ArraySized*>(a), static_cast<const BitmapSized*>(b),
+                                           result_type);
         }
         case CTYPE_PAIR(CTy::Bitmap, CTy::RLE): {
             return froaring_and_inplace_br(static_cast<BitmapSized*>(a), static_cast<const RLESized*>(b), result_type);

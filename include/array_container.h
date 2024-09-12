@@ -28,11 +28,16 @@ public:
         std::cout << std::endl;
     }
 
-    ArrayContainer(SizeType capacity = ARRAY_CONTAINER_INIT_CAPACITY, SizeType size = 0)
+    explicit ArrayContainer(SizeType capacity = ARRAY_CONTAINER_INIT_CAPACITY, SizeType size = 0)
         : capacity(std::max(capacity, size)),
           size(size),
           vals(static_cast<IndexOrNumType*>(malloc(capacity * sizeof(IndexOrNumType)))) {
         assert(vals && "Failed to allocate memory for ArrayContainer");
+    }
+    explicit ArrayContainer(const ArrayContainer& other) {
+        expand_to(other.size);
+        std::memcpy(vals, other.vals, other.size * sizeof(IndexOrNumType));
+        size = other.size;
     }
 
     ~ArrayContainer() {
@@ -45,13 +50,12 @@ public:
                   << "done" << std::endl;
     }
 
-    ArrayContainer(const ArrayContainer&) = delete;
     ArrayContainer& operator=(const ArrayContainer&) = delete;
 
     void clear() { size = 0; }
 
     void set(IndexOrNumType num) {
-        auto pos = (size ? lower_bound(num) : 0);
+        IndexOrNumType pos = (size ? lower_bound(num) : 0);
         if (pos < size && vals[pos] == num) return;
 
         if (size == capacity) expand();
@@ -104,11 +108,13 @@ public:
     SizeType cardinality() const { return size; }
 
 private:
-    void expand() {
-        capacity *= 2;
-        void* new_memory = realloc(vals, capacity * sizeof(IndexOrNumType));
+    void expand() { expand_to(this->capacity * 2); }
+
+    void expand_to(SizeType new_cap) {
+        void* new_memory = realloc(vals, new_cap * sizeof(IndexOrNumType));
         assert(new_memory && "Failed to reallocate memory for ArrayContainer");
         vals = static_cast<IndexOrNumType*>(new_memory);
+        this->capacity = new_cap;
     }
 
     IndexOrNumType lower_bound(IndexOrNumType num) const {

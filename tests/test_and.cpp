@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include "froaring.h"
 
 using namespace froaring;

@@ -38,10 +38,12 @@ bool froaring_equal_ar(const ArrayContainer<WordType, DataBits>* a, const RLECon
     size_t pos = 0;
     for (size_t i = 0; i < b->run_count; ++i) {
         if (pos >= a->size) return false;
-        if (a->vals[pos] != b->runs[i].start) return false;
-        if (pos + (b->runs[i].end - b->runs[i].start) >= a->size) return false;
-        if (a->vals[pos + (b->runs[i].end - b->runs[i].start)] != b->runs[i].end) return false;
-        pos += (b->runs[i].end - b->runs[i].start) + 1;
+        auto&& val = a->vals[pos];
+        auto&& run = b->runs[i];
+        if (val != run.start) return false;
+        if (pos + (run.end - run.start) >= a->size) return false;
+        if (a->vals[pos + (run.end - run.start)] != run.end) return false;
+        pos += (run.end - run.start) + 1;
     }
     return true;
 }
