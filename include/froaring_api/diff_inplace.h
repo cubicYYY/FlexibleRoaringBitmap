@@ -13,7 +13,7 @@ using CTy = froaring::ContainerType;
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_bb(BitmapContainer<WordType, DataBits>* a,
-                                              const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
     for (size_t i = 0; i < a->WordsCount; ++i) {
         a->words[i] &= (~b->words[i]);
     }
@@ -25,7 +25,7 @@ froaring_container_t* froaring_diff_inplace_bb(BitmapContainer<WordType, DataBit
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_aa(ArrayContainer<WordType, DataBits>* a,
-                                              const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
     if (a->size == 0 || b->size == 0) {
         result_type = CTy::Array;
         return a;
@@ -71,7 +71,7 @@ froaring_container_t* froaring_diff_inplace_aa(ArrayContainer<WordType, DataBits
 /// NOT in-place internally
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_rr(RLEContainer<WordType, DataBits>* a,
-                                              const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     return froaring_diff_rr(a, b, result_type);
 }
@@ -79,7 +79,7 @@ froaring_container_t* froaring_diff_inplace_rr(RLEContainer<WordType, DataBits>*
 /// NOT in-place internally
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_ar(ArrayContainer<WordType, DataBits>* a,
-                                              const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     return froaring_diff_ar(a, b, result_type);  // No need to actually do it in-place
 }
@@ -87,14 +87,14 @@ froaring_container_t* froaring_diff_inplace_ar(ArrayContainer<WordType, DataBits
 /// NOT in-place internally
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_ra(RLEContainer<WordType, DataBits>* a,
-                                              const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     return froaring_diff_ar(b, a, result_type);
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_br(BitmapContainer<WordType, DataBits>* a,
-                                              const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     // TODO: inplace!
     return froaring_diff_br(a, b, result_type);
@@ -102,20 +102,20 @@ froaring_container_t* froaring_diff_inplace_br(BitmapContainer<WordType, DataBit
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_rb(RLEContainer<WordType, DataBits>* a,
-                                              const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO: convert RLE to efficient type
     // TODO: inplace!
     return froaring_diff_br(b, a, result_type);
 }
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_ba(BitmapContainer<WordType, DataBits>* a,
-                                              const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
     return froaring_diff_ba(a, b, result_type);  // should be Array type
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_ab(ArrayContainer<WordType, DataBits>* a,
-                                              const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
+                                               const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
     // TODO:...
 }
 template <typename WordType, size_t DataBits>
@@ -127,21 +127,22 @@ froaring_container_t* froaring_andi(froaring_container_t* a, const froaring_cont
     switch (CTYPE_PAIR(ta, tb)) {
         case CTYPE_PAIR(CTy::Bitmap, CTy::Bitmap): {
             return froaring_diff_inplace_bb(static_cast<BitmapSized*>(a), static_cast<const BitmapSized*>(b),
-                                           result_type);
+                                            result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::Array): {
-            return froaring_diff_inplace_aa(static_cast<ArraySized*>(a), static_cast<const ArraySized*>(b), result_type);
+            return froaring_diff_inplace_aa(static_cast<ArraySized*>(a), static_cast<const ArraySized*>(b),
+                                            result_type);
         }
         case CTYPE_PAIR(CTy::RLE, CTy::RLE): {
             return froaring_diff_inplace_rr(static_cast<RLESized*>(a), static_cast<const RLESized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Bitmap, CTy::Array): {
             return froaring_diff_inplace_ba(static_cast<BitmapSized*>(a), static_cast<const ArraySized*>(b),
-                                           result_type);
+                                            result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::Bitmap): {
             return froaring_diff_inplace_ab(static_cast<ArraySized*>(a), static_cast<const BitmapSized*>(b),
-                                           result_type);
+                                            result_type);
         }
         case CTYPE_PAIR(CTy::Bitmap, CTy::RLE): {
             return froaring_diff_inplace_br(static_cast<BitmapSized*>(a), static_cast<const RLESized*>(b), result_type);

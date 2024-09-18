@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "rle_container.h"
+
+#include <gtest/gtest.h>
 
 namespace froaring {
 

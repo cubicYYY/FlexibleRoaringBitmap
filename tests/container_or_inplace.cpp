@@ -1,15 +1,14 @@
 #include <gtest/gtest.h>
+
 #include "froaring_api/or_inplace.h"
 
 using namespace froaring;
 
 class FroaringOrInplaceTest : public ::testing::Test {
 protected:
-    void SetUp() override {
-    }
+    void SetUp() override {}
 
-    void TearDown() override {
-    }
+    void TearDown() override {}
 };
 
 TEST_F(FroaringOrInplaceTest, OrInplaceBitmapBitmap) {
@@ -82,7 +81,7 @@ TEST_F(FroaringOrInplaceTest, OrInplaceBitmapRLE) {
     RLEContainer<uint32_t, 16> b;
     a.set(1);
     a.set(2);
-    b.runs[0] = {2,4};
+    b.runs[0] = {2, 4};
     b.run_count = 1;
     CTy result_type;
     a.debug_print();
@@ -98,7 +97,7 @@ TEST_F(FroaringOrInplaceTest, OrInplaceBitmapRLE) {
 TEST_F(FroaringOrInplaceTest, OrInplaceRLEBitmap) {
     RLEContainer<uint32_t, 16> a;
     BitmapContainer<uint32_t, 16> b;
-    a.runs[0] = {1,3};
+    a.runs[0] = {1, 3};
     a.run_count = 1;
     b.set(2);
     b.set(3);
@@ -136,7 +135,7 @@ TEST_F(FroaringOrInplaceTest, OrInplaceRangeTest) {
     EXPECT_FALSE((static_cast<BitmapContainer<uint32_t, 16>*>(result))->test(262));
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

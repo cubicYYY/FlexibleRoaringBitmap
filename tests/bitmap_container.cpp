@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "bitmap_container.h"
+
+#include <gtest/gtest.h>
 
 namespace froaring {
 class BitmapContainerTest : public ::testing::Test {
