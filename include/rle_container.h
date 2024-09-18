@@ -34,16 +34,16 @@ public:
         assert(runs && "Failed to allocate memory for RLEContainer");
     }
 
+    explicit RLEContainer(const RLEContainer& other)
+        : capacity(other.run_count),
+          run_count(other.run_count),
+          runs(static_cast<RunPair*>(malloc(this->capacity * sizeof(RunPair)))) {
+        std::memcpy(this->runs, other.runs, sizeof(RunPair) * run_count);
+    }
+
     ~RLEContainer() {
         std::cout << "~RLE" << (void*)this << std::endl;
         free(runs);
-    }
-
-    explicit RLEContainer(const RLEContainer& other) {
-        auto other_size = other.runsCount();
-        expand_to(other_size);
-        std::memcpy(this->runs, other.runs, sizeof(RunPair) * other_size);
-        run_count = other_size;
     }
 
     RLEContainer& operator=(const RLEContainer&) = delete;
@@ -121,7 +121,7 @@ public:
         return count + run_count;
     }
 
-    IndexOrNumType runsCount() const { return run_count; }
+    bool is_full() const { return run_count == 1 && runs[0].start == 0 && runs[0].end == ContainerCapacity - 1; }
 
 private:
     SizeType lower_bound(IndexOrNumType num) const {

@@ -63,7 +63,7 @@ TEST_F(RLEContainerTest, ResetValueInRun) {
     container->reset(7);
     container->reset(253);
 
-    EXPECT_EQ(container->runsCount(), 4);
+    EXPECT_EQ(container->run_count, 4);
     EXPECT_TRUE(container->test(5));
     EXPECT_TRUE(container->test(6));
     EXPECT_FALSE(container->test(7));
@@ -86,12 +86,12 @@ TEST_F(RLEContainerTest, AlternativelySetTest) {
         container->set(i);
     }
     EXPECT_EQ(container->cardinality(), 128);
-    EXPECT_EQ(container->runsCount(), 128);
+    EXPECT_EQ(container->run_count, 128);
     for (size_t i = 1; i < 256; i += 2) {
         container->set(i);
     }
     EXPECT_EQ(container->cardinality(), 256);
-    EXPECT_EQ(container->runsCount(), 1);
+    EXPECT_EQ(container->run_count, 1);
 }
 
 }  // namespace froaring

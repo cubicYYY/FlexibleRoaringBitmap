@@ -1,9 +1,12 @@
 #pragma once
-// TODO: pointer to referece
-// TODO: to const pointers
-#include <bit>
 
+#include <bit>
+#include <cstddef>
+
+#include "array_container.h"
+#include "bitmap_container.h"
 #include "prelude.h"
+#include "rle_container.h"
 
 namespace froaring {
 using CTy = froaring::ContainerType;

@@ -69,7 +69,7 @@ froaring_container_t* froaring_and_rr(const RLEContainer<WordType, DataBits>* a,
                                       const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     result_type = CTy::RLE;
 
-    auto* result = new RLEContainer<WordType, DataBits>(a->runsCount() + b->runsCount());
+    auto* result = new RLEContainer<WordType, DataBits>(a->run_count + b->run_count);
     if (a->run_count == 0 || b->run_count == 0) {
         return result;
     }
@@ -126,9 +126,8 @@ froaring_container_t* froaring_and_ar(const ArrayContainer<WordType, DataBits>* 
     size_t newcard = 0;
     auto rle = b->runs[rlepos];
 
-    while (arraypos < a->size) {
-        const auto arrayval = a->vals[arraypos];
-        while (rle.end < arrayval) {
+    while (true) {
+        while (rle.end < a->vals[arraypos]) {
             ++rlepos;
             if (rlepos == b->run_count) {  // done
                 result->size = newcard;
@@ -136,14 +135,21 @@ froaring_container_t* froaring_and_ar(const ArrayContainer<WordType, DataBits>* 
             }
             rle = b->runs[rlepos];
         }
-        if (rle.start > arrayval) {
+        while (rle.start > a->vals[arraypos]) {
             // FIXME: use Gallop Search (advanceUntil) if the array is big enough
-            while (a->vals[arraypos] < rle.start && arraypos < a->size) {
-                ++arraypos;
-            }
-        } else {
-            result->vals[newcard++] = arrayval;
             ++arraypos;
+            if (arraypos == a->size) {
+                result->size = newcard;
+                return result;
+            }
+        }
+        while (rle.start <= a->vals[arraypos] && a->vals[arraypos] <= rle.end) {
+            result->vals[newcard++] = a->vals[arraypos];
+            ++arraypos;
+            if (arraypos == a->size) {
+                result->size = newcard;
+                return result;
+            }
         }
     }
 
@@ -154,12 +160,12 @@ froaring_container_t* froaring_and_ar(const ArrayContainer<WordType, DataBits>* 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_and_br(const BitmapContainer<WordType, DataBits>* a,
                                       const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
-    auto rle_card = b->cardinality();
-    if (rle_card == 0) {
+    if (b->run_count == 0) {
         auto* result = new BitmapContainer<WordType, DataBits>();
         result_type = CTy::Bitmap;
         return result;
     }
+    auto rle_card = b->cardinality();
     if (rle_card <= ArrayContainer<WordType, DataBits>::ArrayToBitmapCountThreshold) {
         auto* result = new ArrayContainer<WordType, DataBits>();
         size_t newcard = 0;

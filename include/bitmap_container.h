@@ -31,7 +31,6 @@ public:
 
     void debug_print() const {
         for (size_t i = 0; i < WordsCount; ++i) {
-            // std::cout << words[i] << " ";
             WordType w = words[i];
             while (w) {
                 WordType t = w & (~w + 1);
@@ -53,6 +52,7 @@ public:
         }
         const IndexType start_word = start / BitsPerWord;
         const IndexType end_word = end / BitsPerWord;
+
         if (end_word >= WordsCount || start_word >= WordsCount) {
             return;
         }
@@ -64,6 +64,7 @@ public:
 
         if (start_word == end_word) {
             words[end_word] |= (first_mask & last_mask);
+            return;
         }
 
         words[start_word] |= first_mask;

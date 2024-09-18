@@ -5,9 +5,9 @@
 
 #include "array_container.h"
 #include "bitmap_container.h"
+#include "mix_ops.h"
 #include "prelude.h"
 #include "rle_container.h"
-#include "mix_ops.h"
 
 namespace froaring {
 using CTy = froaring::ContainerType;
@@ -35,15 +35,13 @@ froaring_container_t* froaring_or_aa(const ArrayContainer<WordType, DataBits>* a
         result_type = CTy::Array;
         return new ArrayContainer<WordType, DataBits>(*a);
     }
-    std::cout << "ORing two arrays" << std::endl;
     size_t max_new_card = a->size + b->size;
     if (a->size > b->size) {  // consider the small array first to make it faster
         std::swap(a, b);
     }
 
     // If both are small, we'll definitely get a new ArrayContainer
-    if (max_new_card <=
-        ArrayContainer<WordType, DataBits>::ArrayToBitmapCountThreshold) { 
+    if (max_new_card <= ArrayContainer<WordType, DataBits>::ArrayToBitmapCountThreshold) {
         auto* result =
             new ArrayContainer<WordType, DataBits>(max_new_card);  // the union of sets never have no more elements
 
@@ -107,10 +105,10 @@ froaring_container_t* froaring_or_aa(const ArrayContainer<WordType, DataBits>* a
 
     // Otherwise, the result may be dense, so we use a BitmapContainer
     result_type = CTy::Bitmap;
-    auto* result = froaring_array_to_bitmap(a);
-    froaring_bitmap_set_array(result, b);
+    auto* result = array_to_bitmap(a);
+    bitmap_set_array(result, b);
     auto new_bitmap_card = b->cardinality();
-    if (new_bitmap_card < ArrayContainer<WordType, DataBits>::ArrayToBitmapCountThreshold) { // 
+    if (new_bitmap_card < ArrayContainer<WordType, DataBits>::ArrayToBitmapCountThreshold) {  //
         result_type = CTy::Array;
         return froaring_bitmap_to_array(result);
     }
@@ -128,7 +126,7 @@ froaring_container_t* froaring_or_rr(const RLEContainer<WordType, DataBits>* a,
         return new RLEContainer<WordType, DataBits>(*a);
     }
 
-    auto* result = new RLEContainer<WordType, DataBits>(a->runsCount() + b->runsCount());
+    auto* result = new RLEContainer<WordType, DataBits>(a->run_count + b->run_count);
     size_t i = 0, j = 0;
     size_t new_card = 0;
     // FIXME: Uncombined runs! e.g., [1,2] + [3,4] => [1,4], however this method will NOT perform this.
@@ -178,7 +176,7 @@ froaring_container_t* froaring_or_ar(const ArrayContainer<WordType, DataBits>* a
 
     auto* result = new RLEContainer<WordType, DataBits>(*b);
     auto array_size = a->size;
-    for (size_t i=0;i<array_size;i++) {
+    for (size_t i = 0; i < array_size; i++) {
         result->set(a->vals[i]);
     }
     return result;
@@ -189,8 +187,8 @@ froaring_container_t* froaring_or_br(const BitmapContainer<WordType, DataBits>* 
                                      const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     result_type = CTy::Bitmap;
     auto* result = new BitmapContainer<WordType, DataBits>(*a);
-    auto rle_count = b->runsCount();
-    for (size_t i=0;i<rle_count;i++) {
+    auto rle_count = b->run_count;
+    for (size_t i = 0; i < rle_count; i++) {
         result->set_range(b->runs[i].start, b->runs[i].end);
     }
     return result;
@@ -201,7 +199,7 @@ froaring_container_t* froaring_or_ba(const BitmapContainer<WordType, DataBits>* 
                                      const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
     result_type = CTy::Bitmap;
     auto* result = new BitmapContainer<WordType, DataBits>(*a);
-    froaring_bitmap_set_array(result, b);
+    bitmap_set_array(result, b);
     return result;
 }
 

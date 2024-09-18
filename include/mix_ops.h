@@ -24,10 +24,11 @@ inline ArrayContainer<WordType, DataBits>* froaring_bitmap_to_array(const Bitmap
         }
         base += DataBits;
     }
+    assert(outpos == cardinality);
     return ans;
 }
 template <typename WordType, size_t DataBits>
-inline BitmapContainer<WordType, DataBits>* froaring_array_to_bitmap(const ArrayContainer<WordType, DataBits>* c) {
+inline BitmapContainer<WordType, DataBits>* array_to_bitmap(const ArrayContainer<WordType, DataBits>* c) {
     auto ans = new BitmapContainer<WordType, DataBits>();
     auto size = c->cardinality();
     for (size_t i = 0; i < size; ++i) {
@@ -36,15 +37,14 @@ inline BitmapContainer<WordType, DataBits>* froaring_array_to_bitmap(const Array
     return ans;
 }
 template <typename WordType, size_t DataBits>
-inline void froaring_bitmap_set_array(BitmapContainer<WordType, DataBits>* b,
-                                      const ArrayContainer<WordType, DataBits>* a) {
+inline void bitmap_set_array(BitmapContainer<WordType, DataBits>* b, const ArrayContainer<WordType, DataBits>* a) {
     auto size = a->cardinality();
     for (size_t i = 0; i < size; ++i) {
         b->set(a->vals[i]);
     }
 }
 template <typename WordType, size_t DataBits>
-inline froaring_container_t* froaring_duplicate_container(const froaring_container_t* c, ContainerType ctype) {
+inline froaring_container_t* duplicate_container(const froaring_container_t* c, ContainerType ctype) {
     switch (ctype) {
         case ContainerType::Array:
             return new ArrayContainer<WordType, DataBits>(*static_cast<const ArrayContainer<WordType, DataBits>*>(c));
@@ -58,14 +58,16 @@ inline froaring_container_t* froaring_duplicate_container(const froaring_contain
 }
 
 template <typename WordType, typename IndexType, size_t DataBits>
-inline ContainerHandle<IndexType> froaring_duplicate_container(const ContainerHandle<IndexType>& c) {
+inline ContainerHandle<IndexType> duplicate_container(const ContainerHandle<IndexType>& c) {
     froaring_container_t* ptr;
     switch (c.type) {
         case ContainerType::Array:
-            ptr = new ArrayContainer<WordType, DataBits>(*static_cast<const ArrayContainer<WordType, DataBits>*>(c.ptr));
+            ptr =
+                new ArrayContainer<WordType, DataBits>(*static_cast<const ArrayContainer<WordType, DataBits>*>(c.ptr));
             break;
         case ContainerType::Bitmap:
-            ptr = new BitmapContainer<WordType, DataBits>(*static_cast<const BitmapContainer<WordType, DataBits>*>(c.ptr));
+            ptr = new BitmapContainer<WordType, DataBits>(
+                *static_cast<const BitmapContainer<WordType, DataBits>*>(c.ptr));
             break;
         case ContainerType::RLE:
             ptr = new RLEContainer<WordType, DataBits>(*static_cast<const RLEContainer<WordType, DataBits>*>(c.ptr));

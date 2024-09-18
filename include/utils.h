@@ -22,7 +22,6 @@ inline bool container_empty(const froaring_container_t* c, CTy type) {
 
 template <typename WordType, size_t DataBits>
 inline void release_container(froaring_container_t* c, CTy type) {
-    std::cout << "RELEASINGddd: " << (void*)c << std::endl;
     switch (type) {
         case CTy::Array:
             delete static_cast<ArrayContainer<WordType, DataBits>*>(c);
@@ -40,19 +39,16 @@ inline void release_container(froaring_container_t* c, CTy type) {
 
 template <typename WordType, size_t DataBits>
 inline void release_container(ArrayContainer<WordType, DataBits>* c) {
-    std::cout << "RELEASINGa: " << (void*)c << std::endl;
     delete c;
 }
 
 template <typename WordType, size_t DataBits>
 inline void release_container(RLEContainer<WordType, DataBits>* c) {
-    std::cout << "RELEASINGr: " << (void*)c << std::endl;
     delete c;
 }
 
 template <typename WordType, size_t DataBits>
 inline void release_container(BitmapContainer<WordType, DataBits>* c) {
-    std::cout << "RELEASINGb: " << (void*)c << std::endl;
     delete c;
 }
 

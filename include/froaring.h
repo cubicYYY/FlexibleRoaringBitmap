@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -11,6 +12,7 @@
 #include "array_container.h"
 #include "binsearch_index.h"
 #include "bitmap_container.h"
+#include "froaring_api/equal.h"
 #include "mix_ops.h"
 #include "prelude.h"
 #include "rle_container.h"
@@ -90,15 +92,12 @@ public:
     FlexibleRoaringBitmap& operator=(FlexibleRoaringBitmap&& other) = default;
 
     ~FlexibleRoaringBitmap() {
-        std::cout << "~FRBM" << (void*)this << std::endl;
         if (!handle.ptr) {
             return;
         }
         if (handle.type == CTy::Containers) {
-            std::cout << "Deleting containers..." << (void*)handle.ptr << std::endl;
             delete castToContainers(handle.ptr);
         } else {
-            std::cout << "Deleting single..." << std::endl;
             release_container<WordType, DataBits>(handle.ptr, handle.type);
         }
     }
@@ -492,44 +491,142 @@ public:
 
         // One of them are containers:
         const ContainersSized* containers;
-        const ContainerHandle* rhs;
+        const ContainerHandle* single;
         if (handle.type == CTy::Containers) {  // the other is not containers
             containers = castToContainers(handle.ptr);
-            rhs = &other.handle;
-        } else if (other.handle.type == CTy::Containers) {  // the other is not containers
+            single = &other.handle;
+        } else if (other.handle.type == CTy::Containers) {  // the other is containers
             containers = castToContainers(other.handle.ptr);
-            rhs = &handle;
-        } else {
-            FROARING_UNREACHABLE
+            single = &handle;
         }
 
-        auto pos = containers->lower_bound(rhs->index);
-        auto result_ctns = new ContainersSized(containers->size + 1, 0);
+        auto pos = containers->lower_bound(single->index);
+        auto result_ctns = new ContainersSized(0, containers->size + 1);
+        typename ContainersSized::IndexType new_size = 0;
         for (size_t i = 0; i < pos; ++i) {
-            result_ctns->containers[result_ctns->size++] =
-                froaring_duplicate_container<WordType, IndexType, DataBits>(containers->containers[i]);
+            result_ctns->containers[new_size++] =
+                duplicate_container<WordType, IndexType, DataBits>(containers->containers[i]);
         }
 
         // Update or insert
-        if (pos < containers->size && containers->containers[pos].index == rhs->index) {
+        if (pos < containers->size && containers->containers[pos].index == single->index) {
             CTy local_res_type;
-            auto ptr = froaring_or<WordType, DataBits>(containers->containers[pos].ptr, rhs->ptr,
-                                                       containers->containers[pos].type, rhs->type, local_res_type);
-            result_ctns->containers[result_ctns->size++] = ContainerHandle(ptr, local_res_type, rhs->index);
+            auto ptr = froaring_or<WordType, DataBits>(containers->containers[pos].ptr, single->ptr,
+                                                       containers->containers[pos].type, single->type, local_res_type);
+            result_ctns->containers[new_size++] = ContainerHandle(ptr, local_res_type, single->index);
             pos++;
         } else {
-            result_ctns->containers[result_ctns->size++] =
-                froaring_duplicate_container<WordType, IndexType, DataBits>(*rhs);
+            result_ctns->containers[new_size++] = duplicate_container<WordType, IndexType, DataBits>(*single);
         }
 
         for (size_t i = pos; i < containers->size; ++i) {
-            result_ctns->containers[result_ctns->size++] =
-                froaring_duplicate_container<WordType, IndexType, DataBits>(containers->containers[i]);
+            result_ctns->containers[new_size++] =
+                duplicate_container<WordType, IndexType, DataBits>(containers->containers[i]);
         }
+        result_ctns->size = new_size;
         return FlexibleRoaringBitmap<WordType, IndexBits, DataBits>(result_ctns, CTy::Containers, ANY_INDEX);
     }
     FlexibleRoaringBitmap& operator|=(const FlexibleRoaringBitmap& other) noexcept {
-        // TODO...
+        if (!is_inited()) {
+            this->handle = duplicate_container<WordType, IndexType, DataBits>(other.handle);
+            return *this;
+        }
+        if (!other.is_inited()) {
+            return *this;
+        }
+        // Both are single container:
+        if (handle.type != CTy::Containers && other.handle.type != CTy::Containers) {
+            if (handle.index == other.handle.index) {
+                CTy local_res_type;
+                auto ptr = froaring_ori<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type,
+                                                            other.handle.type, local_res_type);
+                // new container has been created, and the old one should be released by the caller
+                // (i.e., this function)
+                if (ptr != handle.ptr) {
+                    release_container<WordType, DataBits>(handle.ptr, handle.type);
+                }
+                handle.ptr = ptr;
+                handle.type = local_res_type;
+                return *this;
+            } else {  // So we need to make it into Containers
+                ContainersSized* containers = new ContainersSized(2);
+                if (handle.index < other.handle.index) {
+                    containers->containers[0] = std::move(handle);
+                    containers->containers[1] = duplicate_container<WordType, IndexType, DataBits>(other.handle);
+                } else {
+                    containers->containers[0] = duplicate_container<WordType, IndexType, DataBits>(other.handle);
+                    containers->containers[1] = std::move(handle);
+                }
+                handle = ContainerHandle(containers, CTy::Containers, ANY_INDEX);
+                return *this;
+            }
+        }
+
+        // Both are containers
+        if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
+            ContainersSized::ori(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
+            return *this;
+        }
+
+        // One of them are containers:
+        if (handle.type == CTy::Containers) {  // the other is not containers
+            auto containers = castToContainers(handle.ptr);
+            auto&& single = other.handle;
+            auto pos = containers->lower_bound(single.index);
+
+            // Update or insert
+            if (pos < containers->size && containers->containers[pos].index == single.index) {
+                // The corresponding container is found:
+                CTy local_res_type;
+                auto ptr =
+                    froaring_ori<WordType, DataBits>(containers->containers[pos].ptr, single.ptr,
+                                                     containers->containers[pos].type, single.type, local_res_type);
+                if (ptr != containers->containers[pos].ptr) {
+                    release_container<WordType, DataBits>(containers->containers[pos].ptr,
+                                                          containers->containers[pos].type);
+                    containers->containers[pos] = ContainerHandle(ptr, local_res_type, single.index);
+                }
+            } else {
+                // We need to insert a new container if the corresponding container not found:
+                if (containers->size == containers->capacity) {
+                    containers->expand_to(containers->size + 1);
+                }
+                std::memmove(&containers->containers[pos + 1], &containers->containers[pos],
+                             (containers->size - pos) * sizeof(ContainerHandle));
+                containers->containers[pos] = duplicate_container<WordType, IndexType, DataBits>(single);
+                containers->size++;
+            }
+        } else {  // the other is containers, duplicate and insert
+            auto containers = castToContainers(other.handle.ptr);
+            auto single = std::move(handle);
+            size_t pos = containers->lower_bound(single.index);
+            typename ContainersSized::IndexType new_size = 0;
+            ContainersSized* new_containers = new ContainersSized(containers->size + 1);
+            handle = ContainerHandle(containers, CTy::Containers, ANY_INDEX);
+            for (size_t i = 0; i < pos; i++) {
+                new_containers->containers[new_size++] =
+                    duplicate_container<WordType, IndexType, DataBits>(containers->containers[i]);
+            }
+            // Update or insert
+            if (pos < containers->size && containers->containers[pos].index == single.index) {
+                CTy local_res_type;
+                auto ptr =
+                    froaring_ori<WordType, DataBits>(containers->containers[pos].ptr, single.ptr,
+                                                     containers->containers[pos].type, single.type, local_res_type);
+                new_containers->containers[new_size++] = ContainerHandle(ptr, local_res_type, single.index);
+                pos++;
+            } else {  // just insert it
+                new_containers->containers[new_size++] = duplicate_container<WordType, IndexType, DataBits>(single);
+            }
+
+            for (size_t i = pos; i < containers->size; ++i) {
+                new_containers->containers[new_size++] =
+                    duplicate_container<WordType, IndexType, DataBits>(containers->containers[i]);
+            }
+            new_containers->size = new_size;
+        }
+
+        return *this;
     }
     // FlexibleRoaringBitmap operator^(const FlexibleRoaringBitmap& other) const noexcept {
     //     // TODO...
@@ -549,7 +646,7 @@ public:
     void switchToContainers() {
         assert(handle.type != CTy::Containers && "Already indexed!");
 
-        ContainersSized* containers = new ContainersSized(CONTAINERS_INIT_CAPACITY, 1);
+        ContainersSized* containers = new ContainersSized(1);
         containers->containers[0] = std::move(handle);
         handle = ContainerHandle(containers, CTy::Containers, ANY_INDEX);
     }

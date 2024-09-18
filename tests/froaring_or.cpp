@@ -14,7 +14,7 @@ TEST_F(FroaringOrTest, OrOperatorBothUninitialized) {
     FlexibleRoaringBitmap<uint64_t, 16, 8> a;
     FlexibleRoaringBitmap<uint64_t, 16, 8> b;
     auto result = a | b;
-    ASSERT_FALSE(result.is_inited());
+    EXPECT_FALSE(result.is_inited());
 }
 
 TEST_F(FroaringOrTest, OrOperatorLeftUninitialized) {
@@ -23,8 +23,8 @@ TEST_F(FroaringOrTest, OrOperatorLeftUninitialized) {
     b.set(1);
     auto result = a | b;
     result.debug_print();
-    ASSERT_TRUE(result.is_inited());
-    ASSERT_TRUE(result.test(1));
+    EXPECT_TRUE(result.is_inited());
+    EXPECT_TRUE(result.test(1));
 }
 
 TEST_F(FroaringOrTest, OrOperatorRightUninitialized) {
@@ -32,8 +32,8 @@ TEST_F(FroaringOrTest, OrOperatorRightUninitialized) {
     FlexibleRoaringBitmap<uint64_t, 16, 8> b;
     a.set(1);
     auto result = a | b;
-    ASSERT_TRUE(result.is_inited());
-    ASSERT_TRUE(result.test(1));
+    EXPECT_TRUE(result.is_inited());
+    EXPECT_TRUE(result.test(1));
 }
 
 TEST_F(FroaringOrTest, OrOperatorBothSingleContainer) {
@@ -41,12 +41,12 @@ TEST_F(FroaringOrTest, OrOperatorBothSingleContainer) {
     FlexibleRoaringBitmap<uint64_t, 16, 8> b;
     a.set(1);
     b.set(2);
-    ASSERT_TRUE(a.handle.type == CTy::Array);
-    ASSERT_TRUE(b.handle.type == CTy::Array);
+    EXPECT_TRUE(a.handle.type == CTy::Array);
+    EXPECT_TRUE(b.handle.type == CTy::Array);
     auto result = a | b;
-    ASSERT_TRUE(result.is_inited());
-    ASSERT_TRUE(result.test(1));
-    ASSERT_TRUE(result.test(2));
+    EXPECT_TRUE(result.is_inited());
+    EXPECT_TRUE(result.test(1));
+    EXPECT_TRUE(result.test(2));
 }
 
 TEST_F(FroaringOrTest, OrOperatorBothContainers) {
@@ -57,10 +57,10 @@ TEST_F(FroaringOrTest, OrOperatorBothContainers) {
     b.set(2);
     b.set(10000);
     auto result = a | b;
-    ASSERT_TRUE(result.is_inited());
-    ASSERT_TRUE(result.test(1));
-    ASSERT_TRUE(result.test(2));
-    ASSERT_TRUE(result.test(10000));
+    EXPECT_TRUE(result.is_inited());
+    EXPECT_TRUE(result.test(1));
+    EXPECT_TRUE(result.test(2));
+    EXPECT_TRUE(result.test(10000));
 }
 
 TEST_F(FroaringOrTest, OrOperatorOneContainer) {
@@ -70,10 +70,10 @@ TEST_F(FroaringOrTest, OrOperatorOneContainer) {
     a.set(10000);
     b.set(2);
     auto result = a | b;
-    ASSERT_TRUE(result.is_inited());
-    ASSERT_TRUE(result.test(1));
-    ASSERT_TRUE(result.test(2));
-    ASSERT_TRUE(result.test(10000));
+    EXPECT_TRUE(result.is_inited());
+    EXPECT_TRUE(result.test(1));
+    EXPECT_TRUE(result.test(2));
+    EXPECT_TRUE(result.test(10000));
 }
 
 TEST_F(FroaringOrTest, OrOperatorRangeTest) {
@@ -87,17 +87,17 @@ TEST_F(FroaringOrTest, OrOperatorRangeTest) {
     }
     auto result = a | b;
     result.debug_print();
-    ASSERT_TRUE(result.is_inited());
+    EXPECT_TRUE(result.is_inited());
     for (uint64_t i = 200; i < 260; ++i) {
-        ASSERT_TRUE(result.test(i));
+        EXPECT_TRUE(result.test(i));
     }
     for (uint64_t i = 263; i < 513; ++i) {
-        ASSERT_TRUE(result.test(i));
+        EXPECT_TRUE(result.test(i));
     }
-    ASSERT_FALSE(result.test(261));
-    ASSERT_FALSE(result.test(262));
-    ASSERT_TRUE(result.test(260));
-    ASSERT_TRUE(result.test(513));
+    EXPECT_FALSE(result.test(261));
+    EXPECT_FALSE(result.test(262));
+    EXPECT_TRUE(result.test(260));
+    EXPECT_TRUE(result.test(513));
 }
 
 }  // namespace froaring

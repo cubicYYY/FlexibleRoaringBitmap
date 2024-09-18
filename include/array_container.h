@@ -34,21 +34,15 @@ public:
           vals(static_cast<IndexOrNumType*>(malloc(capacity * sizeof(IndexOrNumType)))) {
         assert(vals && "Failed to allocate memory for ArrayContainer");
     }
-    explicit ArrayContainer(const ArrayContainer& other) {
-        expand_to(other.size);
+    explicit ArrayContainer(const ArrayContainer& other)
+        : capacity(other.size),
+          size(other.size),
+          vals(static_cast<IndexOrNumType*>(malloc(this->capacity * sizeof(IndexOrNumType)))) {
+        std::cout << "yes!" << std::endl;
         std::memcpy(vals, other.vals, other.size * sizeof(IndexOrNumType));
-        size = other.size;
     }
 
-    ~ArrayContainer() {
-        std::cout << "~Array" << (void*)this << std::endl;
-
-        std::cout << "freeing vals" << (void*)vals << std::endl;
-        free(vals);
-
-        std::cout << "~Array"
-                  << "done" << std::endl;
-    }
+    ~ArrayContainer() { free(vals); }
 
     ArrayContainer& operator=(const ArrayContainer&) = delete;
 
@@ -107,7 +101,6 @@ public:
 
     SizeType cardinality() const { return size; }
 
-private:
     void expand() { expand_to(this->capacity * 2); }
 
     void expand_to(SizeType new_cap) {
@@ -117,6 +110,7 @@ private:
         this->capacity = new_cap;
     }
 
+private:
     IndexOrNumType lower_bound(IndexOrNumType num) const {
         assert(size && "Cannot find lower bound in an empty container");
         SizeType left = 0;
