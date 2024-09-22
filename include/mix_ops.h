@@ -12,7 +12,7 @@ inline ArrayContainer<WordType, DataBits>* froaring_bitmap_to_array(const Bitmap
     // TODO: accelerate with SSE, AVX2 or AVX512
     auto cardinality = c->cardinality();
     auto ans = new ArrayContainer<WordType, DataBits>(cardinality, cardinality);
-    int outpos = 0;
+    size_t outpos = 0;
     typename ArrayContainer<WordType, DataBits>::IndexOrNumType base = 0;
     for (size_t i = 0; i < c->WordsCount; ++i) {
         WordType w = c->words[i];
@@ -60,6 +60,9 @@ inline froaring_container_t* duplicate_container(const froaring_container_t* c, 
 template <typename WordType, typename IndexType, size_t DataBits>
 inline ContainerHandle<IndexType> duplicate_container(const ContainerHandle<IndexType>& c) {
     froaring_container_t* ptr;
+    if (c.ptr == nullptr) {
+        return ContainerHandle<IndexType>(nullptr, c.type, c.index);
+    }
     switch (c.type) {
         case ContainerType::Array:
             ptr =

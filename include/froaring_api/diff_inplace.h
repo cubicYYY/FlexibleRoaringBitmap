@@ -2,9 +2,9 @@
 
 #include <bit>
 
-#include "and.h"
 #include "array_container.h"
 #include "bitmap_container.h"
+#include "diff.h"
 #include "prelude.h"
 #include "rle_container.h"
 
@@ -76,51 +76,109 @@ froaring_container_t* froaring_diff_inplace_rr(RLEContainer<WordType, DataBits>*
     return froaring_diff_rr(a, b, result_type);
 }
 
-/// NOT in-place internally
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_ar(ArrayContainer<WordType, DataBits>* a,
                                                const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
-    // TODO: convert RLE to efficient type
-    return froaring_diff_ar(a, b, result_type);  // No need to actually do it in-place
+    result_type = CTy::Array;
+
+    if (a->size == 0 || b->size == 0) {
+        return a;
+    }
+
+    if (b->run_count == 0) {
+        return a;
+    }
+
+    size_t rlepos = 0;
+    size_t arraypos = 0;
+    size_t newcard = 0;
+    auto rle = b->runs[rlepos];
+
+    // We can overwrite the values since arraypos >= newcard
+    while (true) {
+        while (rle.end < a->vals[arraypos]) {
+        SKIP_FIRST_COMPARE:
+            ++rlepos;
+            if (rlepos == b->run_count) {  // done
+                while (arraypos < a->size) {
+                    a->vals[newcard++] = a->vals[arraypos];
+                    ++arraypos;
+                }
+                a->size = newcard;
+                return a;
+            }
+            rle = b->runs[rlepos];
+        }
+        while (rle.start > a->vals[arraypos]) {
+            a->vals[newcard++] = a->vals[arraypos];
+            ++arraypos;
+            if (arraypos == a->size) {
+                a->size = newcard;
+                return a;
+            }
+        }
+        while (rle.start <= a->vals[arraypos] && a->vals[arraypos] <= rle.end) {
+            // TODO: use Gallop search
+            ++arraypos;
+            if (arraypos == a->size) {
+                a->size = newcard;
+                return a;
+            }
+            goto SKIP_FIRST_COMPARE;
+        }
+    }
+
+    FROARING_UNREACHABLE;
 }
 
 /// NOT in-place internally
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_ra(RLEContainer<WordType, DataBits>* a,
                                                const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
-    // TODO: convert RLE to efficient type
-    return froaring_diff_ar(b, a, result_type);
+    // TODO: inplace!
+    return froaring_diff_ra(a, b, result_type);
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_br(BitmapContainer<WordType, DataBits>* a,
                                                const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
-    // TODO: convert RLE to efficient type
-    // TODO: inplace!
-    return froaring_diff_br(a, b, result_type);
+    result_type = CTy::Bitmap;
+    for (size_t i = 0; i < b->run_count; i++) {
+        a->reset_range(b->runs[i].start, b->runs[i].end);
+    }
+    return a;
+    // TODO: convert into ArrayContainer if the cardinality is low?
 }
 
+/// NOT in-place internally
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_rb(RLEContainer<WordType, DataBits>* a,
                                                const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
-    // TODO: convert RLE to efficient type
-    // TODO: inplace!
-    return froaring_diff_br(b, a, result_type);
-}
-template <typename WordType, size_t DataBits>
-froaring_container_t* froaring_diff_inplace_ba(BitmapContainer<WordType, DataBits>* a,
-                                               const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
-    return froaring_diff_ba(a, b, result_type);  // should be Array type
+    return froaring_diff_rb(a, b, result_type);
 }
 
 template <typename WordType, size_t DataBits>
+froaring_container_t* froaring_diff_inplace_ba(BitmapContainer<WordType, DataBits>* a,
+                                               const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+    // TODO: accelerate with assembly
+    result_type = CTy::Bitmap;
+    for (size_t i = 0; i < b->size; ++i) {
+        auto val = b->vals[i];
+        a->reset(val);
+    }
+    return a;
+}
+
+/// NOT in-place internally
+template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_inplace_ab(ArrayContainer<WordType, DataBits>* a,
                                                const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
-    // TODO:...
+    return froaring_diff_ab(a, b, result_type);
 }
+
 template <typename WordType, size_t DataBits>
-froaring_container_t* froaring_andi(froaring_container_t* a, const froaring_container_t* b, CTy ta, CTy tb,
-                                    CTy& result_type) {
+froaring_container_t* froaring_diffi(froaring_container_t* a, const froaring_container_t* b, CTy ta, CTy tb,
+                                     CTy& result_type) {
     using RLESized = RLEContainer<WordType, DataBits>;
     using ArraySized = ArrayContainer<WordType, DataBits>;
     using BitmapSized = BitmapContainer<WordType, DataBits>;

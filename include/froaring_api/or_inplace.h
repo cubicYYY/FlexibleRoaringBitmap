@@ -1,6 +1,6 @@
 #pragma once
 
-// FIXME: convert to full rle
+// TODO: convert to full rle?
 
 #include <bit>
 
@@ -46,8 +46,7 @@ froaring_container_t* froaring_or_inplace_aa(ArrayContainer<WordType, DataBits>*
     }
     // If the result may be large...
     result_type = CTy::Bitmap;
-    auto bitset_ptr = new BitmapContainer<WordType, DataBits>();
-    bitmap_set_array(bitset_ptr, a);
+    auto bitset_ptr = array_to_bitmap(a);
     bitmap_set_array(bitset_ptr, b);
     return bitset_ptr;
     // TODO: maybe convert to array if the result cardinality is low?

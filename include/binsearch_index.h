@@ -313,14 +313,14 @@ public:
             while (a->containers[i].index < b->containers[j].index) {
             SKIP_FIRST_COMPARE:
                 i++;
-                if (i >= a->size) {
+                if (i == a->size) {
                     result->size = new_container_counts;
                     return result;
                 }
             }
             while (a->containers[i].index > b->containers[j].index) {
                 j++;
-                if (j >= b->size) {
+                if (j == b->size) {
                     result->size = new_container_counts;
                     return result;
                 }
@@ -330,8 +330,12 @@ public:
                 auto res =
                     froaring_and<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr, a->containers[i].type,
                                                      b->containers[j].type, local_res_type);
-                result->containers[new_container_counts++] =
-                    ContainerHandle(res, local_res_type, a->containers[i].index);
+                if (container_empty<WordType, DataBits>(res, local_res_type)) {
+                    release_container<WordType, DataBits>(res, local_res_type);
+                } else {
+                    result->containers[new_container_counts++] =
+                        ContainerHandle(res, local_res_type, a->containers[i].index);
+                }
                 i++;
                 j++;
                 if (i == a->size || j == b->size) {
@@ -358,7 +362,7 @@ public:
                 result->containers[new_container_counts++] =
                     ContainerHandle(dup, a->containers[i].type, a->containers[i].index);
                 i++;
-                if (i >= a->size) {
+                if (i == a->size) {
                     while (j < b->size) {
                         froaring_container_t* dup =
                             duplicate_container<WordType, DataBits>(b->containers[j].ptr, b->containers[j].type);
@@ -376,7 +380,7 @@ public:
                 result->containers[new_container_counts++] =
                     ContainerHandle(dup, b->containers[j].type, b->containers[j].index);
                 j++;
-                if (j >= b->size) {
+                if (j == b->size) {
                     while (i < a->size) {
                         froaring_container_t* dup =
                             duplicate_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
@@ -408,7 +412,7 @@ public:
                     result->size = new_container_counts;
                     return result;
                 }
-                if (j >= b->size) {
+                if (j == b->size) {
                     while (i < a->size) {
                         froaring_container_t* dup =
                             duplicate_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
@@ -416,6 +420,62 @@ public:
                             ContainerHandle(dup, a->containers[i].type, a->containers[i].index);
                         i++;
                     }
+                    result->size = new_container_counts;
+                    return result;
+                }
+            } else {
+                goto SKIP_FIRST_COMPARE;
+            }
+        }
+        FROARING_UNREACHABLE
+    }
+
+    static BinsearchIndex<WordType, IndexBits, DataBits>* diff(const BinsearchIndex<WordType, IndexBits, DataBits>* a,
+                                                               const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
+        auto result = new BinsearchIndex<WordType, IndexBits, DataBits>(0, a->size);
+        SizeType i = 0, j = 0;
+        SizeType new_container_counts = 0;
+        while (true) {
+            while (a->containers[i].index < b->containers[j].index) {
+            SKIP_FIRST_COMPARE:
+                froaring_container_t* dup =
+                    duplicate_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+                result->containers[new_container_counts++] =
+                    ContainerHandle(dup, a->containers[i].type, a->containers[i].index);
+                i++;
+                if (i == a->size) {
+                    result->size = new_container_counts;
+                    return result;
+                }
+            }
+            while (a->containers[i].index > b->containers[j].index) {
+                j++;
+                if (j == b->size) {
+                    while (i < a->size) {
+                        froaring_container_t* dup =
+                            duplicate_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+                        result->containers[new_container_counts++] =
+                            ContainerHandle(dup, a->containers[i].type, a->containers[i].index);
+                        i++;
+                    }
+                    result->size = new_container_counts;
+                    return result;
+                }
+            }
+            if (a->containers[i].index == b->containers[j].index) {
+                CTy local_res_type;
+                auto res =
+                    froaring_diff<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr, a->containers[i].type,
+                                                      b->containers[j].type, local_res_type);
+                if (container_empty<WordType, DataBits>(res, local_res_type)) {
+                    release_container<WordType, DataBits>(res, local_res_type);
+                } else {
+                    result->containers[new_container_counts++] =
+                        ContainerHandle(res, local_res_type, a->containers[i].index);
+                }
+                i++;
+                j++;
+                if (i == a->size || j == b->size) {
                     result->size = new_container_counts;
                     return result;
                 }
@@ -441,12 +501,14 @@ public:
                 if (new_container != a->containers[i].ptr) {  // New container is created: release the old one
                     release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
                 }
-                if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
-                    release_container<WordType, DataBits>(new_container, local_res_type);
-                }
-                a->containers[new_container_counts].ptr = new_container;
-                a->containers[new_container_counts].type = local_res_type;
-                new_container_counts++;
+                // FIXME: wipe out empty containers!
+
+                // if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
+                //     release_container<WordType, DataBits>(new_container, local_res_type);
+                // } else {
+                //     a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
+                // }
+                a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
                 ++i;
                 ++j;
             } else if (keya < keyb) {
@@ -468,6 +530,7 @@ public:
         // TODO: handle full RLE specifically
 
         // FIXME: do we will ever have empty "BinsearchIndex" ?
+        // Make sure this never happens, then remove this branch.
         if (a->size == 0) {
             a->expand_to(b->size);
             for (size_t j = 0; j < b->size; j++) {
@@ -524,8 +587,46 @@ public:
                 j++;
             }
         }
+    }
+    static void diffi(BinsearchIndex<WordType, IndexBits, DataBits>* a,
+                      const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
+        SizeType i = 0, j = 0;
+        SizeType new_container_counts = 0;
+        while (i < a->size && j < b->size) {
+            auto keya = a->containers[i].index;
+            auto keyb = b->containers[j].index;
+            if (keya == keyb) {
+                CTy local_res_type;
+                auto new_container =
+                    froaring_diffi<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr,
+                                                       a->containers[i].type, b->containers[j].type, local_res_type);
+                if (new_container != a->containers[i].ptr) {  // New container is created: release the old one
+                    release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+                }
+                // FIXME: wipe out empty containers?
 
-        std::cout << "asize=" << a->size << std::endl;
+                // if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
+                //     release_container<WordType, DataBits>(new_container, local_res_type);
+                //     memmove...
+                // } else {
+                //     a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
+                // }
+
+                a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
+                ++i;
+                ++j;
+            } else if (keya < keyb) {
+                i = a->advanceAndReleaseUntil(keyb, i);
+            } else {
+                j = b->advanceAndReleaseUntil(keya, j);
+            }
+        }
+        // Release the rest of the containers
+        for (auto pos = new_container_counts; pos < a->size; ++pos) {
+            release_container<WordType, DataBits>(a->containers[pos].ptr, a->containers[pos].type);
+            a->containers[pos].ptr = nullptr;
+        }
+        a->size = new_container_counts;
     }
     SizeType advanceAndReleaseUntil(IndexType key, SizeType pos) const {
         while (pos < size && containers[pos].index < key) {

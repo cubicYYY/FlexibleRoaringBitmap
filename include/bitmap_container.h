@@ -15,7 +15,8 @@ public:
     static constexpr size_t TotalBits = (1 << DataBits);
     static constexpr size_t WordsCount = (TotalBits + BitsPerWord - 1) / BitsPerWord;  // ceiling
     using NumType = froaring::can_fit_t<DataBits>;
-    using IndexType = froaring::can_fit_t<cexpr_log2(WordsCount)>;  // FIXME: weird...
+    using IndexType = froaring::can_fit_t<cexpr_log2(WordsCount)>;  // FIXME: weird... we need the result floored, but
+                                                                    // currently it is ceiled.
     using SizeType = froaring::can_fit_t<DataBits + 1>;
     static constexpr WordType IndexInsideWordMask = (1ULL << cexpr_log2(BitsPerWord)) - 1;
 

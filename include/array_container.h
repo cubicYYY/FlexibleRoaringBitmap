@@ -6,8 +6,6 @@
 #include <iostream>
 
 #include "prelude.h"
-
-// FIXME: check all the memmove-s!
 namespace froaring {
 template <typename WordType, size_t DataBits>
 class ArrayContainer : public froaring_container_t {

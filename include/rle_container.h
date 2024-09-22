@@ -7,8 +7,7 @@
 
 #include "prelude.h"
 
-// TODO: addRange may delete runs in middle!(
-// FIXME: Check all the memmove-s!
+// TODO: addRange may delete runs in middle!(not implemented, just a reminder for whom will)
 namespace froaring {
 template <typename WordType, size_t DataBits>
 class RLEContainer : public froaring_container_t {

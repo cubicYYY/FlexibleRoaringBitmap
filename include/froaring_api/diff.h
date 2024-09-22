@@ -79,7 +79,7 @@ froaring_container_t* froaring_diff_aa(const ArrayContainer<WordType, DataBits>*
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_rr(const RLEContainer<WordType, DataBits>* a,
                                        const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
-    // TODO:...
+    // FIXME:...
     FROARING_NOT_IMPLEMENTED
 }
 
@@ -139,6 +139,30 @@ froaring_container_t* froaring_diff_ar(const ArrayContainer<WordType, DataBits>*
 }
 
 template <typename WordType, size_t DataBits>
+froaring_container_t* froaring_diff_ra(const RLEContainer<WordType, DataBits>* a,
+                                       const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+    result_type = CTy::Array;
+
+    if (a->run_count == 0) {
+        return new ArrayContainer<WordType, DataBits>();
+    }
+
+    if (b->size == 0) {
+        return new RLEContainer<WordType, DataBits>(*a);
+    }
+
+    result_type = CTy::RLE;
+    auto* result = new RLEContainer<WordType, DataBits>(*a);
+    for (size_t i = 0; i < b->size; ++i) {
+        auto val = b->vals[i];
+        result->reset(val);
+    }
+    return result;
+
+    // TODO: Use more efficient type depends on the cardinality!
+}
+
+template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_br(const BitmapContainer<WordType, DataBits>* a,
                                        const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     if (b->run_count == 0) {
@@ -153,17 +177,77 @@ froaring_container_t* froaring_diff_br(const BitmapContainer<WordType, DataBits>
     }
     result_type = CTy::Bitmap;
     return result;
+    // TODO: maybe convert to ArrayContainer if the cardinality is low?
+}
+
+template <typename WordType, size_t DataBits>
+froaring_container_t* froaring_diff_rb(const RLEContainer<WordType, DataBits>* a,
+                                       const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
+    size_t card = a->cardinality();
+    if (card <= ArrayContainer<WordType, DataBits>::ArrayToBitmapCountThreshold) {
+        result_type = CTy::Array;
+        auto* result = new ArrayContainer<WordType, DataBits>(card, 0);
+        for (size_t rlepos = 0; rlepos < a->run_count; ++rlepos) {
+            auto rle = a->runs[rlepos];
+            for (auto run_value = rle.start; run_value <= rle.end; ++run_value) {
+                if (!b->test(run_value)) {
+                    result->vals[result->size++] = run_value;
+                }
+            }
+        }
+        return result;
+    } else {  // we guess it will be a bitset, though have to check guess when done
+        FROARING_NOT_IMPLEMENTED
+        // auto* result = new RLEContainer<WordType, DataBits>(*b);
+
+        // uint32_t last_pos = 0;
+        // for (int32_t rlepos = 0; rlepos < result->runs_count; ++rlepos) {
+        //     auto rle = a->runs[rlepos];
+
+        //     uint32_t start = rle.start;
+        //     uint32_t end = rle.end;
+        //     // FIXME: TODO: ...
+        //     FROARING_NOT_IMPLEMENTED
+        //     // bitset_reset_range(result->words, last_pos, start);
+        //     // bitset_flip_range(result->words, start, end);
+        //     last_pos = end;
+        // }
+        // // bitset_reset_range(result->words, last_pos, ...);
+
+        // // TODO: maybe convert to ArrayContainer if the cardinality is low?
+        // return result;  // bitset
+    }
 }
 
 template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_diff_ba(const BitmapContainer<WordType, DataBits>* a,
                                        const ArrayContainer<WordType, DataBits>* b, CTy& result_type) {
+    // TODO: accelerate with assembly
     result_type = CTy::Bitmap;
     auto* result = new BitmapContainer<WordType, DataBits>(*a);
     for (size_t i = 0; i < b->size; ++i) {
         auto val = b->vals[i];
         result->reset(val);
     }
+    return result;
+}
+
+template <typename WordType, size_t DataBits>
+froaring_container_t* froaring_diff_ab(const ArrayContainer<WordType, DataBits>* a,
+                                       const BitmapContainer<WordType, DataBits>* b, CTy& result_type) {
+    // TODO: accelerate with assembly
+
+    result_type = CTy::Array;
+
+    auto* result = new ArrayContainer<WordType, DataBits>(a->size, 0);
+    size_t new_size = 0;
+    for (size_t i = 0; i < a->size; ++i) {
+        auto val = a->vals[i];
+        if (!b->test(val)) {
+            result->vals[new_size++] = val;
+        }
+    }
+    result->size = new_size;
     return result;
 }
 
@@ -188,19 +272,19 @@ froaring_container_t* froaring_diff(const froaring_container_t* a, const froarin
             return froaring_diff_ba(static_cast<const BitmapSized*>(a), static_cast<const ArraySized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::Bitmap): {
-            return froaring_diff_ba(static_cast<const BitmapSized*>(b), static_cast<const ArraySized*>(a), result_type);
+            return froaring_diff_ab(static_cast<const ArraySized*>(a), static_cast<const BitmapSized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Bitmap, CTy::RLE): {
             return froaring_diff_br(static_cast<const BitmapSized*>(a), static_cast<const RLESized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::RLE, CTy::Bitmap): {
-            return froaring_diff_br(static_cast<const BitmapSized*>(b), static_cast<const RLESized*>(a), result_type);
+            return froaring_diff_rb(static_cast<const RLESized*>(a), static_cast<const BitmapSized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::Array, CTy::RLE): {
             return froaring_diff_ar(static_cast<const ArraySized*>(a), static_cast<const RLESized*>(b), result_type);
         }
         case CTYPE_PAIR(CTy::RLE, CTy::Array): {
-            return froaring_diff_ar(static_cast<const ArraySized*>(b), static_cast<const RLESized*>(a), result_type);
+            return froaring_diff_ra(static_cast<const RLESized*>(a), static_cast<const ArraySized*>(b), result_type);
         }
         default:
             FROARING_UNREACHABLE
