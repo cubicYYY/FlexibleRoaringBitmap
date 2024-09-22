@@ -36,7 +36,6 @@ public:
         : capacity(other.size),
           size(other.size),
           vals(static_cast<IndexOrNumType*>(malloc(this->capacity * sizeof(IndexOrNumType)))) {
-        std::cout << "yes!" << std::endl;
         std::memcpy(vals, other.vals, other.size * sizeof(IndexOrNumType));
     }
 

@@ -11,15 +11,15 @@ protected:
 };
 
 TEST_F(FroaringOrTest, OrOperatorBothUninitialized) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> a;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> b;
+    FlexibleRoaring<uint64_t, 16, 8> a;
+    FlexibleRoaring<uint64_t, 16, 8> b;
     auto result = a | b;
     EXPECT_FALSE(result.is_inited());
 }
 
 TEST_F(FroaringOrTest, OrOperatorLeftUninitialized) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> a;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> b;
+    FlexibleRoaring<uint64_t, 16, 8> a;
+    FlexibleRoaring<uint64_t, 16, 8> b;
     b.set(1);
     auto result = a | b;
     result.debug_print();
@@ -28,8 +28,8 @@ TEST_F(FroaringOrTest, OrOperatorLeftUninitialized) {
 }
 
 TEST_F(FroaringOrTest, OrOperatorRightUninitialized) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> a;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> b;
+    FlexibleRoaring<uint64_t, 16, 8> a;
+    FlexibleRoaring<uint64_t, 16, 8> b;
     a.set(1);
     auto result = a | b;
     EXPECT_TRUE(result.is_inited());
@@ -37,8 +37,8 @@ TEST_F(FroaringOrTest, OrOperatorRightUninitialized) {
 }
 
 TEST_F(FroaringOrTest, OrOperatorBothSingleContainer) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> a;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> b;
+    FlexibleRoaring<uint64_t, 16, 8> a;
+    FlexibleRoaring<uint64_t, 16, 8> b;
     a.set(1);
     b.set(2);
     EXPECT_TRUE(a.handle.type == CTy::Array);
@@ -50,8 +50,8 @@ TEST_F(FroaringOrTest, OrOperatorBothSingleContainer) {
 }
 
 TEST_F(FroaringOrTest, OrOperatorBothContainers) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> a;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> b;
+    FlexibleRoaring<uint64_t, 16, 8> a;
+    FlexibleRoaring<uint64_t, 16, 8> b;
     a.set(1);
     a.set(10000);
     b.set(2);
@@ -64,8 +64,8 @@ TEST_F(FroaringOrTest, OrOperatorBothContainers) {
 }
 
 TEST_F(FroaringOrTest, OrOperatorOneContainer) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> a;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> b;
+    FlexibleRoaring<uint64_t, 16, 8> a;
+    FlexibleRoaring<uint64_t, 16, 8> b;
     a.set(1);
     a.set(10000);
     b.set(2);
@@ -77,8 +77,8 @@ TEST_F(FroaringOrTest, OrOperatorOneContainer) {
 }
 
 TEST_F(FroaringOrTest, OrOperatorRangeTest) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> a;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> b;
+    FlexibleRoaring<uint64_t, 16, 8> a;
+    FlexibleRoaring<uint64_t, 16, 8> b;
     for (uint64_t i = 200; i <= 260; ++i) {
         a.set(i);
     }

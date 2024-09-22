@@ -1,4 +1,4 @@
-#include "rle_container.h"
+#include "froaring_api/rle_container.h"
 
 #include <gtest/gtest.h>
 

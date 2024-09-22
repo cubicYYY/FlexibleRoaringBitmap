@@ -3,9 +3,9 @@
 #include "froaring.h"
 
 namespace froaring {
-TEST(FlexibleRoaringBitmapTest, AndInplace) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> bitmap1;
-    FlexibleRoaringBitmap<uint64_t, 16, 8> bitmap2;
+TEST(FlexibleRoaringTest, AndInplace) {
+    FlexibleRoaring<uint64_t, 16, 8> bitmap1;
+    FlexibleRoaring<uint64_t, 16, 8> bitmap2;
 
     bitmap1.set(1);
     bitmap1.set(2);

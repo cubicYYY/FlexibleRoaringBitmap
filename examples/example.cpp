@@ -6,7 +6,7 @@
 using namespace std;
 
 int main() {
-    froaring::FlexibleRoaringBitmap<> a;
+    froaring::FlexibleRoaring<> a;
 
     a.set(1);
     a.set(100);
@@ -35,7 +35,7 @@ int main() {
     assert(a.count() == 4);
     assert(a == a);
 
-    froaring::FlexibleRoaringBitmap<> x, y;
+    froaring::FlexibleRoaring<> x, y;
     x.set(1);
     x.set(2);
     x.set(3);

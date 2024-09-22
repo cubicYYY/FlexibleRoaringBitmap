@@ -2,10 +2,7 @@
 
 #include <cstring>
 
-#include "handle.h"
-#include "mix_ops.h"
-#include "prelude.h"
-#include "utils.h"
+#include "api.h"
 
 namespace froaring {
 
@@ -142,7 +139,6 @@ public:
             array_ptr->vals[0] = data;
             containers[pos] = ContainerHandle(array_ptr, CTy::Array, index);
             size++;
-            debug_print();
             return;
         }
 
@@ -561,8 +557,6 @@ public:
                 if (i == a->size) break;
                 if (j == b->size) break;
             } else if (a->containers[i].index < b->containers[j].index) {
-                std::cout << "less" << std::endl;
-
                 i++;
                 if (i == a->size) break;
             } else {  // the index in a > the index in b

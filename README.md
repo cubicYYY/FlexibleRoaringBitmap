@@ -30,8 +30,8 @@ Out-of-the-box bitmap for handling sparse bit maps.
 
 ```bash
 # Clone the repository
-git clone https://github.com/cubicYYY/FlexibleRoaringBitmap.git
-cd ./FlexibleRoaringBitmap
+git clone https://github.com/cubicYYY/FlexibleRoaring.git
+cd ./FlexibleRoaring
 
 # Build examples
 mkdir build

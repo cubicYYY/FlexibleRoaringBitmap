@@ -40,10 +40,7 @@ public:
         std::memcpy(this->runs, other.runs, sizeof(RunPair) * run_count);
     }
 
-    ~RLEContainer() {
-        std::cout << "~RLE" << (void*)this << std::endl;
-        free(runs);
-    }
+    ~RLEContainer() { free(runs); }
 
     RLEContainer& operator=(const RLEContainer&) = delete;
 

@@ -4,40 +4,40 @@
 
 using namespace froaring;
 
-class FlexibleRoaringBitmapDiffTest : public ::testing::Test {
+class FlexibleRoaringDiffTest : public ::testing::Test {
 protected:
     void SetUp() override {}
 
     void TearDown() override {}
 };
 
-TEST_F(FlexibleRoaringBitmapDiffTest, DiffBothUninitialized) {
-    FlexibleRoaringBitmap<uint32_t, 16, 16> a;
-    FlexibleRoaringBitmap<uint32_t, 16, 16> b;
+TEST_F(FlexibleRoaringDiffTest, DiffBothUninitialized) {
+    FlexibleRoaring<uint32_t, 16, 16> a;
+    FlexibleRoaring<uint32_t, 16, 16> b;
     auto result = a - b;
     ASSERT_FALSE(result.is_inited());
 }
 
-TEST_F(FlexibleRoaringBitmapDiffTest, DiffLeftUninitialized) {
-    FlexibleRoaringBitmap<uint32_t, 16, 16> a;
-    FlexibleRoaringBitmap<uint32_t, 16, 16> b;
+TEST_F(FlexibleRoaringDiffTest, DiffLeftUninitialized) {
+    FlexibleRoaring<uint32_t, 16, 16> a;
+    FlexibleRoaring<uint32_t, 16, 16> b;
     b.set(1);
     auto result = a - b;
     ASSERT_FALSE(result.is_inited());
 }
 
-TEST_F(FlexibleRoaringBitmapDiffTest, DiffRightUninitialized) {
-    FlexibleRoaringBitmap<uint32_t, 16, 16> a;
-    FlexibleRoaringBitmap<uint32_t, 16, 16> b;
+TEST_F(FlexibleRoaringDiffTest, DiffRightUninitialized) {
+    FlexibleRoaring<uint32_t, 16, 16> a;
+    FlexibleRoaring<uint32_t, 16, 16> b;
     a.set(1);
     auto result = a - b;
     ASSERT_TRUE(result.is_inited());
     ASSERT_TRUE(result.test(1));
 }
 
-TEST_F(FlexibleRoaringBitmapDiffTest, DiffBothSingleContainer) {
-    FlexibleRoaringBitmap<uint32_t, 16, 16> a;
-    FlexibleRoaringBitmap<uint32_t, 16, 16> b;
+TEST_F(FlexibleRoaringDiffTest, DiffBothSingleContainer) {
+    FlexibleRoaring<uint32_t, 16, 16> a;
+    FlexibleRoaring<uint32_t, 16, 16> b;
     a.set(1);
     a.set(2);
     b.set(2);
@@ -49,9 +49,9 @@ TEST_F(FlexibleRoaringBitmapDiffTest, DiffBothSingleContainer) {
     ASSERT_FALSE(result.test(3));
 }
 
-TEST_F(FlexibleRoaringBitmapDiffTest, DiffBothContainers) {
-    FlexibleRoaringBitmap<uint32_t, 16, 16> a;
-    FlexibleRoaringBitmap<uint32_t, 16, 16> b;
+TEST_F(FlexibleRoaringDiffTest, DiffBothContainers) {
+    FlexibleRoaring<uint32_t, 16, 16> a;
+    FlexibleRoaring<uint32_t, 16, 16> b;
     a.set(1);
     a.set(10000);
     b.set(2);
@@ -63,9 +63,9 @@ TEST_F(FlexibleRoaringBitmapDiffTest, DiffBothContainers) {
     ASSERT_FALSE(result.test(2));
 }
 
-TEST_F(FlexibleRoaringBitmapDiffTest, DiffOneContainer) {
-    FlexibleRoaringBitmap<uint32_t, 16, 16> a;
-    FlexibleRoaringBitmap<uint32_t, 16, 16> b;
+TEST_F(FlexibleRoaringDiffTest, DiffOneContainer) {
+    FlexibleRoaring<uint32_t, 16, 16> a;
+    FlexibleRoaring<uint32_t, 16, 16> b;
     a.set(1);
     a.set(10000);
     b.set(2);
@@ -76,9 +76,9 @@ TEST_F(FlexibleRoaringBitmapDiffTest, DiffOneContainer) {
     ASSERT_FALSE(result.test(2));
 }
 
-TEST_F(FlexibleRoaringBitmapDiffTest, DiffRangeTest) {
-    FlexibleRoaringBitmap<uint32_t, 16, 16> a;
-    FlexibleRoaringBitmap<uint32_t, 16, 16> b;
+TEST_F(FlexibleRoaringDiffTest, DiffRangeTest) {
+    FlexibleRoaring<uint32_t, 16, 16> a;
+    FlexibleRoaring<uint32_t, 16, 16> b;
     for (uint32_t i = 200; i <= 260; ++i) {
         a.set(i);
     }

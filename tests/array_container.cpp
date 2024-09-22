@@ -1,4 +1,4 @@
-#include "array_container.h"
+#include "froaring_api/array_container.h"
 
 #include <gtest/gtest.h>
 

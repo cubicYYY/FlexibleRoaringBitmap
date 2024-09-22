@@ -2,15 +2,15 @@
 
 #include "froaring.h"
 
-class FlexibleRoaringBitmapTest : public ::testing::Test {
+class FlexibleRoaringTest : public ::testing::Test {
 protected:
     void SetUp() override {}
 
     void TearDown() override {}
 };
 namespace froaring {
-TEST(FlexibleRoaringBitmapTest, RemoveAndCheckEmptyContainers) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> bitmap;
+TEST(FlexibleRoaringTest, RemoveAndCheckEmptyContainers) {
+    FlexibleRoaring<uint64_t, 16, 8> bitmap;
 
     bitmap.set(1);
     bitmap.set(2);
@@ -45,8 +45,8 @@ TEST(FlexibleRoaringBitmapTest, RemoveAndCheckEmptyContainers) {
     std::cout << "Finished..." << std::endl;
 }
 
-TEST(FlexibleRoaringBitmapTest, TypeConversion) {
-    FlexibleRoaringBitmap<uint64_t, 16, 8> bitmap;
+TEST(FlexibleRoaringTest, TypeConversion) {
+    FlexibleRoaring<uint64_t, 16, 8> bitmap;
 
     for (auto i = 0; i < 1000; i++) {
         bitmap.set(i);

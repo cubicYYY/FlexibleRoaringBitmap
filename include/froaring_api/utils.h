@@ -1,9 +1,9 @@
 #pragma once
 
-#include "array_container.h"
-#include "bitmap_container.h"
+#include "froaring_api/array_container.h"
+#include "froaring_api/bitmap_container.h"
+#include "froaring_api/rle_container.h"
 #include "prelude.h"
-#include "rle_container.h"
 namespace froaring {
 using CTy = froaring::ContainerType;
 template <typename WordType, size_t DataBits>

@@ -27,6 +27,22 @@ inline ArrayContainer<WordType, DataBits>* froaring_bitmap_to_array(const Bitmap
     assert(outpos == cardinality);
     return ans;
 }
+
+template <typename WordType, size_t DataBits>
+inline ArrayContainer<WordType, DataBits>* froaring_rle_to_array(const RLEContainer<WordType, DataBits>* c) {
+    // TODO: accelerate with SSE, AVX2 or AVX512
+    auto cardinality = c->cardinality();
+    size_t outpos = 0;
+    auto ans = new ArrayContainer<WordType, DataBits>(cardinality, cardinality);
+    for (size_t i = 0; i < c->run_count; ++i) {
+        for (typename ArrayContainer<WordType, DataBits>::IndexOrNumType j = c->runs[i].start; j <= c->runs[i].end;
+             j++) {
+            ans->vals[outpos++] = j;
+        }
+    }
+    return ans;
+}
+
 template <typename WordType, size_t DataBits>
 inline BitmapContainer<WordType, DataBits>* array_to_bitmap(const ArrayContainer<WordType, DataBits>* c) {
     auto ans = new BitmapContainer<WordType, DataBits>();
