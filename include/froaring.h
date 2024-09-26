@@ -104,18 +104,26 @@ public:
             return;
         }
         switch (handle.type) {
-            case CTy::Array:
+            case CTy::Array: {
+                std::cout << "ARRAY!" << std::endl;
                 static_cast<ArrayContainer<WordType, DataBits>*>(handle.ptr)->debug_print();
                 break;
-            case CTy::Bitmap:
+            }
+            case CTy::Bitmap: {
+                std::cout << "BITMAP!" << std::endl;
                 static_cast<BitmapContainer<WordType, DataBits>*>(handle.ptr)->debug_print();
                 break;
-            case CTy::RLE:
+            }
+            case CTy::RLE: {
+                std::cout << "RLE!" << std::endl;
                 static_cast<RLEContainer<WordType, DataBits>*>(handle.ptr)->debug_print();
                 break;
-            case CTy::Containers:
+            }
+            case CTy::Containers: {
+                std::cout << "CONTAINERS!" << std::endl;
                 castToContainers(handle.ptr)->debug_print();
                 break;
+            }
             default:
                 FROARING_UNREACHABLE
         }
@@ -895,13 +903,13 @@ public:
                 return FlexibleRoaringIterator(tracking, 0, 0);
             case CTy::RLE: {
                 auto bitmap_ptr = static_cast<RLEContainer<WordType, DataBits>*>(tracking.handle.ptr);
-                auto converted_array = froaring_rle_to_array<WordType, DataBits>(bitmap_ptr);
+                auto converted_array = rle_to_array<WordType, DataBits>(bitmap_ptr);
                 ;
                 return FlexibleRoaringIterator(tracking, tracking.handle.index, 0, converted_array);
             }
             case CTy::Bitmap: {
                 auto bitmap_ptr = static_cast<BitmapContainer<WordType, DataBits>*>(tracking.handle.ptr);
-                auto converted_array = froaring_bitmap_to_array<WordType, DataBits>(bitmap_ptr);
+                auto converted_array = bitmap_to_array<WordType, DataBits>(bitmap_ptr);
                 ;
                 return FlexibleRoaringIterator(tracking, tracking.handle.index, 0, converted_array);
             }
@@ -914,14 +922,14 @@ public:
                     case CTy::Array:
                         return FlexibleRoaringIterator(tracking, 0, 0);
                     case CTy::RLE: {
-                        auto converted_array = froaring_rle_to_array<WordType, DataBits>(
+                        auto converted_array = rle_to_array<WordType, DataBits>(
                             static_cast<RLEContainer<WordType, DataBits>*>(containers->containers[0].ptr));
 
                         return FlexibleRoaringIterator(tracking, 0, 0, converted_array);
                     }
 
                     case CTy::Bitmap: {
-                        auto converted_array = froaring_bitmap_to_array<WordType, DataBits>(
+                        auto converted_array = bitmap_to_array<WordType, DataBits>(
                             static_cast<BitmapContainer<WordType, DataBits>*>(containers->containers[0].ptr));
 
                         return FlexibleRoaringIterator(tracking, 0, 0, converted_array);
@@ -947,6 +955,10 @@ public:
         return pos_or_index == o.pos_or_index && arraypos == o.arraypos;
     }
 
+    bool operator!=(const FlexibleRoaringIterator& o) const {
+        return pos_or_index != o.pos_or_index || arraypos != o.arraypos;
+    }
+
     // ++i
     FlexibleRoaringIterator& operator++() {
         switch (tracking.handle.type) {
@@ -966,8 +978,8 @@ public:
                     arraypos++;
                     return *this;
                 }
-                pos_or_index = (size_t)(~0);
                 arraypos = 0;
+                pos_or_index = (size_t)(~0);
                 delete array;
                 array = nullptr;
                 return *this;
@@ -976,7 +988,8 @@ public:
                 const auto containers = tracking.castToContainers(tracking.handle.ptr);
                 switch (containers->containers[pos_or_index].type) {
                     case CTy::Array: {
-                        auto arr_ptr = static_cast<ArrayContainer<WordType, DataBits>*>(tracking.handle.ptr);
+                        auto arr_ptr =
+                            static_cast<ArrayContainer<WordType, DataBits>*>(containers->containers[pos_or_index].ptr);
                         if (arraypos + 1 != arr_ptr->size) {
                             arraypos++;
                             return *this;
@@ -984,12 +997,10 @@ public:
                         arraypos = 0;
                         if (pos_or_index + 1 != containers->size) {
                             pos_or_index++;
-                            arraypos = 0;
                             set_array_with_container(containers->containers[pos_or_index]);
                             return *this;
                         }
                         pos_or_index = (size_t)(~0);
-                        arraypos = 0;
                         return *this;
                     }
 
@@ -1003,6 +1014,7 @@ public:
                         if (pos_or_index + 1 != containers->size) {
                             pos_or_index++;
                             delete array;
+                            array = nullptr;
                             set_array_with_container(containers->containers[pos_or_index]);
                             return *this;
                         }
@@ -1050,9 +1062,15 @@ public:
                 FROARING_UNREACHABLE
         }
     }
+    void debug_print() {
+        std::cout << "pos_or_index: " << pos_or_index << ", arraypos: " << arraypos << " , ptr=" << (void*)array
+                  << std::endl;
+    }
 
 private:
     using IndexType = typename FlexibleRoaring<WordType, IndexBits, DataBits>::IndexType;
+
+    /// @brief Create a temporary array container from the given container.
     void set_array_with_container(const ContainerHandle<IndexType>& ch) {
         assert(array == nullptr);
         switch (ch.type) {
@@ -1061,13 +1079,16 @@ private:
                 break;
             }
             case CTy::RLE: {
-                array =
-                    froaring_rle_to_array<WordType, DataBits>(static_cast<RLEContainer<WordType, DataBits>*>(ch.ptr));
+                this->array = rle_to_array<WordType, DataBits>(static_cast<RLEContainer<WordType, DataBits>*>(ch.ptr));
+                std::cout << "RLE->Array:" << std::endl;
+                this->array->debug_print();
                 break;
             }
             case CTy::Bitmap: {
-                array = froaring_bitmap_to_array<WordType, DataBits>(
-                    static_cast<BitmapContainer<WordType, DataBits>*>(ch.ptr));
+                this->array =
+                    bitmap_to_array<WordType, DataBits>(static_cast<BitmapContainer<WordType, DataBits>*>(ch.ptr));
+                std::cout << "Bitmap->Array:" << std::endl;
+                this->array->debug_print();
                 break;
             }
             default:

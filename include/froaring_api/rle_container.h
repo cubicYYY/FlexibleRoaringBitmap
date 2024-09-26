@@ -24,6 +24,7 @@ public:
     static constexpr size_t ContainerCapacity = (1 << DataBits);
     /// RLE threshold (RLE will not be optimum for more runs)
     static constexpr size_t RleToBitmapRunThreshold = ContainerCapacity / (DataBits * 2);
+    static constexpr size_t UseLinearScanThreshold = 8;
 
 public:
     explicit RLEContainer(SizeType capacity = RLE_CONTAINER_INIT_CAPACITY, SizeType run_count = 0)
@@ -121,7 +122,14 @@ public:
 
 private:
     SizeType lower_bound(IndexOrNumType num) const {
-        assert(run_count && "Cannot find lower bound in an empty container");
+        if (run_count < UseLinearScanThreshold) {
+            for (SizeType i = 0; i < run_count; ++i) {
+                if (runs[i].end >= num) {
+                    return i;
+                }
+            }
+            return run_count;
+        }
         SizeType left = 0;
         SizeType right = run_count;
         while (left < right) {

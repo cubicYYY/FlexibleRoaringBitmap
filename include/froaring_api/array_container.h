@@ -17,6 +17,7 @@ public:
     /// Array threshold (Array will not be optimum for storing more
     /// elements)
     static constexpr size_t ArrayToBitmapCountThreshold = ContainerCapacity / DataBits;
+    static constexpr size_t UseLinearScanThreshold = 8;
 
 public:
     void debug_print() {
@@ -109,7 +110,14 @@ public:
 
 private:
     IndexOrNumType lower_bound(IndexOrNumType num) const {
-        assert(size && "Cannot find lower bound in an empty container");
+        if (size < UseLinearScanThreshold) {
+            for (SizeType i = 0; i < size; ++i) {
+                if (vals[i] >= num) {
+                    return i;
+                }
+            }
+            return size;
+        }
         SizeType left = 0;
         SizeType right = size;
         while (left < right) {

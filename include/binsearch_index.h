@@ -24,6 +24,7 @@ public:
     using RLESized = RLEContainer<WordType, DataBits>;
     using BitmapSized = BitmapContainer<WordType, DataBits>;
     using ArraySized = ArrayContainer<WordType, DataBits>;
+    static constexpr size_t UseLinearScanThreshold = 8;
 
     // handy local aliases
     using CTy = froaring::ContainerType;
@@ -82,8 +83,15 @@ public:
     }
 
     /// Return the entry position if found. Otherwise the first position that is greater than `index`.
-    ///
     SizeType lower_bound(IndexType index) const {
+        if (this->size < UseLinearScanThreshold) {
+            for (SizeType i = 0; i < size; ++i) {
+                if (containers[i].index >= index) {
+                    return i;
+                }
+            }
+            return size;
+        }
         SizeType left = 0;
         SizeType right = size;
 
@@ -497,26 +505,24 @@ public:
                 if (new_container != a->containers[i].ptr) {  // New container is created: release the old one
                     release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
                 }
-                // FIXME: wipe out empty containers!
-
-                // if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
-                //     release_container<WordType, DataBits>(new_container, local_res_type);
-                // } else {
-                //     a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
-                // }
-                a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
+                if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
+                    release_container<WordType, DataBits>(new_container, local_res_type);
+                } else {
+                    a->containers[new_container_counts++] =
+                        ContainerHandle(new_container, local_res_type, a->containers[i].index);
+                }
                 ++i;
                 ++j;
             } else if (keya < keyb) {
                 i = a->advanceAndReleaseUntil(keyb, i);
             } else {
-                j = b->advanceAndReleaseUntil(keya, j);
+                j = b->advanceUntil(keya, j);
             }
         }
         // Release the rest of the containers
-        for (auto pos = new_container_counts; pos < a->size; ++pos) {
-            release_container<WordType, DataBits>(a->containers[pos].ptr, a->containers[pos].type);
-            a->containers[pos].ptr = nullptr;
+        for (; i < a->size; ++i) {
+            release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+            a->containers[i].ptr = nullptr;
         }
         a->size = new_container_counts;
     }
@@ -597,35 +603,40 @@ public:
                 if (new_container != a->containers[i].ptr) {  // New container is created: release the old one
                     release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
                 }
-                // FIXME: wipe out empty containers?
 
-                // if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
-                //     release_container<WordType, DataBits>(new_container, local_res_type);
-                //     memmove...
-                // } else {
-                //     a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
-                // }
+                if (container_empty<WordType, DataBits>(new_container, local_res_type)) {
+                    release_container<WordType, DataBits>(new_container, local_res_type);
+                } else {
+                    a->containers[new_container_counts++] =
+                        ContainerHandle(new_container, local_res_type, a->containers[i].index);
+                }
 
-                a->containers[i] = ContainerHandle(new_container, local_res_type, a->containers[i].index);
                 ++i;
                 ++j;
             } else if (keya < keyb) {
                 i = a->advanceAndReleaseUntil(keyb, i);
             } else {
-                j = b->advanceAndReleaseUntil(keya, j);
+                j = b->advanceUntil(keya, j);
             }
         }
         // Release the rest of the containers
-        for (auto pos = new_container_counts; pos < a->size; ++pos) {
-            release_container<WordType, DataBits>(a->containers[pos].ptr, a->containers[pos].type);
-            a->containers[pos].ptr = nullptr;
+        for (; i < a->size; ++i) {
+            release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+            a->containers[i].ptr = nullptr;
         }
         a->size = new_container_counts;
     }
-    SizeType advanceAndReleaseUntil(IndexType key, SizeType pos) const {
+    SizeType advanceAndReleaseUntil(IndexType key, SizeType pos) {
         while (pos < size && containers[pos].index < key) {
             release_container<WordType, DataBits>(containers[pos].ptr, containers[pos].type);
             containers[pos].ptr = nullptr;
+            pos++;
+        }
+        return pos;
+    }
+    SizeType advanceUntil(IndexType key, SizeType pos) const {
+        // TODO: use Gallop search
+        while (pos < size && containers[pos].index < key) {
             pos++;
         }
         return pos;

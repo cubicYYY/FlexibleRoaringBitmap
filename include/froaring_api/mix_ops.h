@@ -8,7 +8,7 @@
 
 namespace froaring {
 template <typename WordType, size_t DataBits>
-inline ArrayContainer<WordType, DataBits>* froaring_bitmap_to_array(const BitmapContainer<WordType, DataBits>* c) {
+inline ArrayContainer<WordType, DataBits>* bitmap_to_array(const BitmapContainer<WordType, DataBits>* c) {
     // TODO: accelerate with SSE, AVX2 or AVX512
     auto cardinality = c->cardinality();
     auto ans = new ArrayContainer<WordType, DataBits>(cardinality, cardinality);
@@ -22,14 +22,14 @@ inline ArrayContainer<WordType, DataBits>* froaring_bitmap_to_array(const Bitmap
             ans->vals[outpos++] = (typename ArrayContainer<WordType, DataBits>::IndexOrNumType)(r + base);
             w ^= t;
         }
-        base += DataBits;
+        base += BitmapContainer<WordType, DataBits>::BitsPerWord;
     }
     assert(outpos == cardinality);
     return ans;
 }
 
 template <typename WordType, size_t DataBits>
-inline ArrayContainer<WordType, DataBits>* froaring_rle_to_array(const RLEContainer<WordType, DataBits>* c) {
+inline ArrayContainer<WordType, DataBits>* rle_to_array(const RLEContainer<WordType, DataBits>* c) {
     // TODO: accelerate with SSE, AVX2 or AVX512
     auto cardinality = c->cardinality();
     size_t outpos = 0;

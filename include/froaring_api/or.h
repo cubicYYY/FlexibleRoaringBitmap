@@ -110,7 +110,7 @@ froaring_container_t* froaring_or_aa(const ArrayContainer<WordType, DataBits>* a
     auto new_bitmap_card = b->cardinality();
     if (new_bitmap_card < ArrayContainer<WordType, DataBits>::ArrayToBitmapCountThreshold) {  //
         result_type = CTy::Array;
-        return froaring_bitmap_to_array(result);
+        return bitmap_to_array(result);
     }
     return result;
 }
