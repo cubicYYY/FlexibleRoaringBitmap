@@ -74,6 +74,40 @@ public:
         std::memset(&words[start_word + 1], 0xFF, (end_word - start_word - 1) * sizeof(NumType));
     }
 
+    bool any_range(NumType start, NumType end) const {
+        if (start >= end) {
+            return false;
+        }
+        const IndexType start_word = start / BitsPerWord;
+        const IndexType end_word = end / BitsPerWord;
+
+        if (start_word >= WordsCount) {
+            return false;
+        }
+        // All "1" from `start` to MSB
+        const WordType first_mask = ~((1ULL << (start & IndexInsideWordMask)) - 1);
+        // All "1" from LSB to `end`
+        const WordType last_mask =
+            ((1ULL << ((end & IndexInsideWordMask))) - 1) ^ (1ULL << ((end & IndexInsideWordMask)));
+
+        if (start_word == end_word) {
+            if (words[start_word] & (first_mask & last_mask)) return true;
+        }
+
+        if (words[start_word] & first_mask) {
+            return true;
+        }
+        if (end_word < WordsCount && words[end_word] & last_mask) {
+            return true;
+        }
+        for (size_t i = start_word + 1; i < std::min((size_t)(end_word), WordsCount); ++i) {
+            if (words[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool test(NumType index) const { return words[index / BitsPerWord] & ((WordType)1 << (index % BitsPerWord)); }
 
     bool test_and_set(NumType index) {
@@ -117,7 +151,7 @@ public:
     /// @param start inclusive.
     /// @param end inclusive.
     /// @return If [start, end] is fully contained in the container.
-    bool containesRange(NumType start, NumType end) const {
+    bool test_range(NumType start, NumType end) const {
         if (start >= end) {
             return true;
         }

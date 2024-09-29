@@ -62,12 +62,12 @@ TEST_F(BitmapContainerTest, ContainsRangeTest) {
     container->reset(67);
     EXPECT_EQ(container->IndexInsideWordMask, 0x3F);  // uint64_t, 64 bits = 2^6 bits, (111111)2=0x3F
     container->debug_print();
-    EXPECT_TRUE(container->containesRange(9, 13));
-    EXPECT_FALSE(container->containesRange(9, 14));
-    EXPECT_FALSE(container->containesRange(8, 13));
-    EXPECT_TRUE(container->containesRange(62, 66));
-    EXPECT_TRUE(container->containesRange(68, 68));
-    EXPECT_FALSE(container->containesRange(62, 68));
+    EXPECT_TRUE(container->test_range(9, 13));
+    EXPECT_FALSE(container->test_range(9, 14));
+    EXPECT_FALSE(container->test_range(8, 13));
+    EXPECT_TRUE(container->test_range(62, 66));
+    EXPECT_TRUE(container->test_range(68, 68));
+    EXPECT_FALSE(container->test_range(62, 68));
 
     EXPECT_EQ(container->cardinality(), 12);
 }
@@ -93,12 +93,12 @@ TEST_F(BitmapContainerTest, NonPowerOf2SizeBitmap) {
     EXPECT_EQ(container->IndexInsideWordMask, 0x3F);  // uint64_t, 64 bits = 2^6 bits, (111111)2=0x3F
     container->debug_print();
     EXPECT_TRUE(container->test(1023));
-    EXPECT_TRUE(container->containesRange(909, 913));
-    EXPECT_FALSE(container->containesRange(909, 914));
-    EXPECT_FALSE(container->containesRange(908, 913));
-    EXPECT_TRUE(container->containesRange(962, 966));
-    EXPECT_TRUE(container->containesRange(968, 968));
-    EXPECT_FALSE(container->containesRange(962, 968));
+    EXPECT_TRUE(container->test_range(909, 913));
+    EXPECT_FALSE(container->test_range(909, 914));
+    EXPECT_FALSE(container->test_range(908, 913));
+    EXPECT_TRUE(container->test_range(962, 966));
+    EXPECT_TRUE(container->test_range(968, 968));
+    EXPECT_FALSE(container->test_range(962, 968));
 
     EXPECT_EQ(container->cardinality(), 12);
     delete container;

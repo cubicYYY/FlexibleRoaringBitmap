@@ -108,7 +108,6 @@ public:
         this->capacity = new_cap;
     }
 
-private:
     IndexOrNumType lower_bound(IndexOrNumType num) const {
         if (size < UseLinearScanThreshold) {
             for (SizeType i = 0; i < size; ++i) {
@@ -129,6 +128,14 @@ private:
             }
         }
         return left;
+    }
+
+    SizeType advanceUntil(IndexOrNumType key, SizeType pos) const {
+        // TODO: use Gallop search
+        while (pos < size && vals[pos] < key) {
+            pos++;
+        }
+        return pos;
     }
 
 public:

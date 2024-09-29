@@ -12,6 +12,8 @@
 #include "binsearch_index.h"
 #include "froaring_api/array_container.h"
 #include "froaring_api/bitmap_container.h"
+#include "froaring_api/intersects.h"
+#include "froaring_api/mix_ops.h"
 #include "froaring_api/prelude.h"
 
 namespace froaring {
@@ -37,8 +39,12 @@ class FlexibleRoaring {
     using ArraySized = ArrayContainer<WordType, DataBits>;
     using CTy = froaring::ContainerType;  // handy local alias
     using ContainerHandle = froaring::ContainerHandle<IndexType>;
+    using iterator = FlexibleRoaringIterator<WordType, IndexBits, DataBits>;
+    using const_iterator = const iterator;
+
     static constexpr IndexType UNKNOWN_INDEX = 0;
     static constexpr IndexType ANY_INDEX = 0;
+
     friend FlexibleRoaringIterator<WordType, IndexBits, DataBits>;
 
 public:
@@ -84,8 +90,8 @@ public:
                 FROARING_UNREACHABLE
         }
     }
-    FlexibleRoaring(FlexibleRoaring&& other) = default;
-    FlexibleRoaring& operator=(FlexibleRoaring&& other) = default;
+
+    FlexibleRoaring(FlexibleRoaring&& other) { handle = other.handle; }
 
     ~FlexibleRoaring() {
         if (!handle.ptr) {
@@ -96,6 +102,41 @@ public:
         } else {
             release_container<WordType, DataBits>(handle.ptr, handle.type);
         }
+    }
+
+    FlexibleRoaring& operator=(FlexibleRoaring&& other) {
+        if (!handle.ptr) {
+            handle = std::move(other.handle);
+            other.handle.ptr = nullptr;
+            return *this;
+        }
+
+        if (handle.type == CTy::Containers) {
+            delete castToContainers(handle.ptr);
+        } else {
+            release_container<WordType, DataBits>(handle.ptr, handle.type);
+        }
+        handle = std::move(other.handle);
+        other.handle.ptr = nullptr;
+        return *this;
+    }
+
+    FlexibleRoaring& operator=(const FlexibleRoaring& other) {
+        if (!handle.ptr) {
+            if (handle.type == CTy::Containers) {
+                delete castToContainers(handle.ptr);
+            } else {
+                release_container<WordType, DataBits>(handle.ptr, handle.type);
+            }
+        }
+        handle.type = other.handle.type;
+        handle.index = other.handle.index;
+        if (other.handle.type == CTy::Containers) {
+            handle.ptr = new ContainersSized(*castToContainers(other.handle.ptr));
+        } else {
+            handle.ptr = duplicate_container<WordType, DataBits>(other.handle.ptr, other.handle.type);
+        }
+        return *this;
     }
 
     void debug_print() {
@@ -127,6 +168,91 @@ public:
             default:
                 FROARING_UNREACHABLE
         }
+    }
+
+    const_iterator begin() const { return FlexibleRoaringIterator<WordType, IndexBits, DataBits>::begin(*this); }
+
+    const_iterator end() const { return FlexibleRoaringIterator<WordType, IndexBits, DataBits>::end(*this); }
+
+    bool contains(const FlexibleRoaring& other) const noexcept {
+        if (!other.is_inited()) {
+            return true;
+        }
+        if (!is_inited()) {
+            return false;
+        }
+        // Both containers
+        if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
+            return ContainersSized::contains(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
+        }
+
+        // One of them are containers:
+        if (handle.type == CTy::Containers) {  // the other is a single container
+            // FIXME: We assume that no empty container in Containers. Is that true?
+            return false;
+        }
+        if (other.handle.type == CTy::Containers) {  // this is a single container
+            const auto other_containers = castToContainers(other.handle.ptr);
+            const ContainerHandle& this_single = handle;
+            auto pos = other_containers->lower_bound(this_single.index);
+            if (pos == other_containers->size) {
+                return false;
+            }
+            if (other_containers->containers[pos].index != this_single.index) {
+                return false;
+            }
+            return froaring_contains<WordType, DataBits>(other_containers->containers[pos].ptr, this_single.ptr,
+                                                         other_containers->containers[pos].type, this_single.type);
+        }
+
+        // Both are single container:
+        if (handle.index != other.handle.index) {
+            return false;
+        }
+        return froaring_contains<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type, other.handle.type);
+    }
+    bool intersects(const FlexibleRoaring& other) const noexcept {
+        if (!is_inited() || !other.is_inited()) {
+            return false;
+        }
+        // Both containers
+        if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
+            return ContainersSized::intersects(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
+        }
+
+        // One of them are containers:
+        if (handle.type == CTy::Containers) {  // the other is a single container
+            const auto this_containers = castToContainers(handle.ptr);
+            const ContainerHandle& other_single = other.handle;
+            auto pos = this_containers->lower_bound(other_single.index);
+            if (pos == this_containers->size) {
+                return false;
+            }
+            const ContainerHandle& lhs = this_containers->containers[pos];
+            if (lhs.index != other_single.index) {
+                return false;
+            }
+            return froaring_intersects<WordType, DataBits>(lhs.ptr, other_single.ptr, lhs.type, other_single.type);
+        }
+        if (other.handle.type == CTy::Containers) {  // this is a single container
+            const auto other_containers = castToContainers(other.handle.ptr);
+            const ContainerHandle& this_single = handle;
+            auto pos = other_containers->lower_bound(this_single.index);
+            if (pos == other_containers->size) {
+                return false;
+            }
+            if (other_containers->containers[pos].index != this_single.index) {
+                return false;
+            }
+            return froaring_intersects<WordType, DataBits>(other_containers->containers[pos].ptr, this_single.ptr,
+                                                           other_containers->containers[pos].type, this_single.type);
+        }
+
+        // Both are single container:
+        if (handle.index != other.handle.index) {
+            return false;
+        }
+        return froaring_intersects<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type, other.handle.type);
     }
 
     void set(WordType num) {
@@ -505,6 +631,14 @@ public:
         // (i.e., this function)
         updateSingleHandle(ptr, local_res_type);
         return *this;
+    }
+
+    void intersectWithComplement(const FlexibleRoaring& other) noexcept { *this -= other; }
+
+    /// @brief Overwrite current FlexibleRoaring with the result of lhs-rhs.
+    void intersectWithComplement(const FlexibleRoaring& lhs, const FlexibleRoaring& rhs) noexcept {
+        *this = lhs;
+        *this -= rhs;
     }
 
     FlexibleRoaring operator|(const FlexibleRoaring& other) const noexcept {

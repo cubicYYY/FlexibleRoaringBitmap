@@ -54,7 +54,7 @@ template <typename WordType, size_t DataBits>
 bool froaring_equal_br(const BitmapContainer<WordType, DataBits>* a, const RLEContainer<WordType, DataBits>* b) {
     if (a->cardinality() != b->cardinality()) return false;
     for (size_t i = 0; i < b->run_count; ++i) {
-        if (!a->containesRange(b->runs[i].start, b->runs[i].end)) {
+        if (!a->test_range(b->runs[i].start, b->runs[i].end)) {
             return false;
         }
     }

@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "api.h"
+#include "froaring_api/contains.h"
 
 namespace froaring {
 
@@ -626,6 +627,74 @@ public:
         }
         a->size = new_container_counts;
     }
+
+    static bool intersects(const BinsearchIndex<WordType, IndexBits, DataBits>* a,
+                           const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
+        SizeType i = 0, j = 0;
+        while (true) {
+            while (a->containers[i].index < b->containers[j].index) {
+            SKIP_FIRST_COMPARE:
+                i++;
+                if (i == a->size) {
+                    return false;
+                }
+            }
+            while (a->containers[i].index > b->containers[j].index) {
+                j++;
+                if (j == b->size) {
+                    return false;
+                }
+            }
+            if (a->containers[i].index == b->containers[j].index) {
+                if (froaring_intersects<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr,
+                                                            a->containers[i].type, b->containers[j].type)) {
+                    return true;
+                }
+                i++;
+                j++;
+                if (i == a->size || j == b->size) {
+                    return false;
+                }
+            } else {
+                goto SKIP_FIRST_COMPARE;
+            }
+        }
+        FROARING_UNREACHABLE
+    }
+
+    static bool contains(const BinsearchIndex<WordType, IndexBits, DataBits>* a,
+                         const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
+        if (b->size == 0) {
+            return true;
+        }
+
+        if (a->size < b->size) {
+            return false;
+        }
+
+        size_t i = 0, j = 0;
+
+        while (i < a->size && j < b->size) {
+            if (a->containers[i].index == b->containers[j].index) {
+                if (!froaring_contains<WordType, DataBits>(a->containers[i].ptr, b->containers[j].ptr,
+                                                           a->containers[i].type, b->containers[j].type)) {
+                    return false;
+                }
+                i++;
+                j++;
+            } else if (b->containers[j].index > a->containers[i].index) {
+                i++;
+            } else {
+                return false;
+            }
+        }
+        if (j == b->size) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     SizeType advanceAndReleaseUntil(IndexType key, SizeType pos) {
         while (pos < size && containers[pos].index < key) {
             release_container<WordType, DataBits>(containers[pos].ptr, containers[pos].type);

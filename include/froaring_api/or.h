@@ -177,7 +177,7 @@ froaring_container_t* froaring_or_ar(const ArrayContainer<WordType, DataBits>* a
     auto* result = new RLEContainer<WordType, DataBits>(*b);
     auto array_size = a->size;
     for (size_t i = 0; i < array_size; i++) {
-        result->set(a->vals[i]);
+        result->set(a->vals[i]);  // FIXME: Do not use set() but manually set on run!
     }
     return result;
 }
