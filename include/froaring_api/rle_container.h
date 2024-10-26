@@ -95,6 +95,7 @@ public:
         return (pos < run_count && runs[pos].start <= num && num <= runs[pos].end);
     }
 
+    /// @brief Set a bit of the container. Return false only if the bit HAS BEEN set.
     bool test_and_set(IndexOrNumType num) {
         bool was_set;
         IndexOrNumType pos;

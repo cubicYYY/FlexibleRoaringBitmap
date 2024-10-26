@@ -8,6 +8,9 @@ namespace froaring {
 using CTy = froaring::ContainerType;
 template <typename WordType, size_t DataBits>
 inline bool container_empty(const froaring_container_t* c, CTy type) {
+    if (!c) {
+        return true;
+    }
     switch (type) {
         case CTy::Array:
             return static_cast<const ArrayContainer<WordType, DataBits>*>(c)->cardinality() == 0;

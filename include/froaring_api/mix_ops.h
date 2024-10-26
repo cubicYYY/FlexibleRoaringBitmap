@@ -96,4 +96,19 @@ inline ContainerHandle<IndexType> duplicate_container(const ContainerHandle<Inde
     }
     return ContainerHandle<IndexType>(ptr, c.type, c.index);
 }
+
+template <typename WordType, size_t DataBits>
+inline froaring_container_t* froaring_count(const froaring_container_t* c, ContainerType ctype) {
+    switch (ctype) {
+        case ContainerType::Array:
+            return static_cast<const ArrayContainer<WordType, DataBits>*>(c)->cardinality();
+        case ContainerType::Bitmap:
+            return static_cast<const BitmapContainer<WordType, DataBits>*>(c)->cardinality();
+        case ContainerType::RLE:
+            return static_cast<const RLEContainer<WordType, DataBits>*>(c)->cardinality();
+        default:
+            FROARING_UNREACHABLE
+    }
+}
+
 };  // namespace froaring

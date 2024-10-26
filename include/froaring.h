@@ -1,14 +1,9 @@
 #pragma once
 
-#include <array>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <limits>
-#include <map>
-#include <vector>
 
-#include "api.h"
 #include "binsearch_index.h"
 #include "froaring_api/array_container.h"
 #include "froaring_api/bitmap_container.h"
@@ -633,12 +628,50 @@ public:
         return *this;
     }
 
-    void intersectWithComplement(const FlexibleRoaring& other) noexcept { *this -= other; }
+    bool intersectWithComplement(const FlexibleRoaring& other) noexcept { return (*this -= other); }
 
     /// @brief Overwrite current FlexibleRoaring with the result of lhs-rhs.
     void intersectWithComplement(const FlexibleRoaring& lhs, const FlexibleRoaring& rhs) noexcept {
         *this = lhs;
         *this -= rhs;
+    }
+
+    /// @brief This is not a real hash: same bitvec with different type may have different hash.
+    size_t hash() const {
+        if (!is_inited()) {
+            return 0;
+        }
+        switch (this->handle.type) {
+            case CTy::Array: {
+                auto arr_ptr = static_cast<ArraySized*>(this->handle.ptr);
+                return arr_ptr->size == 0
+                           ? 0
+                           : arr_ptr->size * 961 + arr_ptr->vals[0] * 31 + arr_ptr->vals[arr_ptr->size - 1];
+            }
+            case CTy::RLE: {
+                auto rle_ptr = static_cast<RLESized*>(this->handle.ptr);
+                return rle_ptr->run_count == 0 ? 0
+                                               : rle_ptr->run_count * 961 + rle_ptr->runs[0].start * 31 +
+                                                     rle_ptr->runs[rle_ptr->run_count - 1].end;
+            }
+            case CTy::Bitmap: {
+                auto btmp_ptr = static_cast<BitmapSized*>(this->handle.ptr);
+                typename BitmapSized::WordType hash = 0;
+                for (size_t i = 0; i < BitmapSized::WordsCount; ++i) {
+                    hash = (hash << 6) ^ btmp_ptr->words[i];
+                }
+                return hash;
+            }
+            case CTy::Containers: {
+                const auto containers = castToContainers(this->handle.ptr);
+                size_t hash = 19260817;
+                for (size_t i = 0; i < containers->size; ++i) {
+                    hash = hash * 31 + containers->containers[i].index;
+                    hash = hash * 31 + containers->containers[i].type;
+                }
+                return hash;
+            }
+        }
     }
 
     FlexibleRoaring operator|(const FlexibleRoaring& other) const noexcept {
@@ -704,20 +737,22 @@ public:
         return FlexibleRoaring<WordType, IndexBits, DataBits>(result_ctns, CTy::Containers, ANY_INDEX);
     }
 
-    FlexibleRoaring& operator|=(const FlexibleRoaring& other) noexcept {
+    bool operator|=(const FlexibleRoaring& other) noexcept {
         if (!is_inited()) {
             this->handle = duplicate_container<WordType, IndexType, DataBits>(other.handle);
-            return *this;
+            return !container_empty<WordType, DataBits>(other.handle.ptr, other.handle.type);
         }
         if (!other.is_inited()) {
-            return *this;
+            return false;
         }
         // Both are single container:
         if (handle.type != CTy::Containers && other.handle.type != CTy::Containers) {
             if (handle.index == other.handle.index) {
                 CTy local_res_type;
-                auto ptr = froaring_ori<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type,
-                                                            other.handle.type, local_res_type);
+                bool changed = false;
+                auto ptr = froaring_ori_changed_chk<WordType, DataBits>(handle.ptr, other.handle.ptr, handle.type,
+                                                                        other.handle.type, local_res_type, changed);
+                std::cout << "changed:" << changed << std::endl;
                 // new container has been created, and the old one should be released by the caller
                 // (i.e., this function)
                 if (ptr != handle.ptr) {
@@ -725,7 +760,7 @@ public:
                 }
                 handle.ptr = ptr;
                 handle.type = local_res_type;
-                return *this;
+                return changed;
             } else {  // So we need to make it into Containers
                 ContainersSized* containers = new ContainersSized(2, 2);
                 if (handle.index < other.handle.index) {
@@ -736,14 +771,13 @@ public:
                     containers->containers[1] = std::move(handle);
                 }
                 handle = ContainerHandle(containers, CTy::Containers, ANY_INDEX);
-                return *this;
+                return true;
             }
         }
 
         // Both are containers
         if (handle.type == CTy::Containers && other.handle.type == CTy::Containers) {
-            ContainersSized::ori(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
-            return *this;
+            return ContainersSized::ori_changed_chk(castToContainers(handle.ptr), castToContainers(other.handle.ptr));
         }
 
         // One of them are containers:
@@ -756,14 +790,16 @@ public:
             if (pos < this_containers->size && this_containers->containers[pos].index == other_single.index) {
                 // The corresponding container is found:
                 CTy local_res_type;
-                auto ptr = froaring_ori<WordType, DataBits>(this_containers->containers[pos].ptr, other_single.ptr,
-                                                            this_containers->containers[pos].type, other_single.type,
-                                                            local_res_type);
+                bool changed = false;
+                auto ptr = froaring_ori_changed_chk<WordType, DataBits>(
+                    this_containers->containers[pos].ptr, other_single.ptr, this_containers->containers[pos].type,
+                    other_single.type, local_res_type, changed);
                 if (ptr != this_containers->containers[pos].ptr) {
                     release_container<WordType, DataBits>(this_containers->containers[pos].ptr,
                                                           this_containers->containers[pos].type);
                 }
                 this_containers->containers[pos] = ContainerHandle(ptr, local_res_type, other_single.index);
+                return changed;
             } else {
                 // We need to insert a new container if the corresponding container not found:
                 if (this_containers->size == this_containers->capacity) {
@@ -773,6 +809,7 @@ public:
                              (this_containers->size - pos) * sizeof(ContainerHandle));
                 this_containers->containers[pos] = duplicate_container<WordType, IndexType, DataBits>(other_single);
                 this_containers->size++;
+                return true;
             }
         } else {  // the other are containers: duplicate and insert. We will create new Containers
             auto other_containers = castToContainers(other.handle.ptr);
@@ -808,9 +845,10 @@ public:
             }
             new_containers->size = new_size;
             this->handle = ContainerHandle(new_containers, CTy::Containers, ANY_INDEX);
+            return true;
         }
 
-        return *this;
+        FROARING_UNREACHABLE
     }
 
     FlexibleRoaring operator-(const FlexibleRoaring& other) const noexcept {
@@ -968,13 +1006,6 @@ public:
         updateSingleHandle(ptr, local_res_type);
         return *this;
     }
-
-    // FlexibleRoaring operator^(const FlexibleRoaring& other) const noexcept {
-    //     // TODO...
-    // }
-    // FlexibleRoaring& operator^=(const FlexibleRoaring& other) noexcept {
-    //     // TODO...
-    // }
 
     /// @brief Called when the current container exceeds the block size:
     /// transform into containers.

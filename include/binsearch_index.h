@@ -4,6 +4,7 @@
 
 #include "api.h"
 #include "froaring_api/contains.h"
+#include "froaring_api/or_inplace.h"
 
 namespace froaring {
 
@@ -532,19 +533,6 @@ public:
         // TODO: tranform into RLE if a container is full
         // TODO: handle full RLE specifically
 
-        // FIXME: do we will ever have empty "BinsearchIndex" ?
-        // Make sure this never happens, then remove this branch.
-        if (a->size == 0) {
-            a->expand_to(b->size);
-            for (size_t j = 0; j < b->size; j++) {
-                a->containers[j] = duplicate_container<WordType, IndexType, DataBits>(b->containers[j]);
-            }
-            a->size = b->size;
-            return;
-        }
-        if (b->size == 0) {
-            return;
-        }
         a->expand_to(a->size + b->size);
         size_t i = 0, j = 0;
         while (true) {
@@ -589,6 +577,63 @@ public:
             }
         }
     }
+
+    static bool ori_changed_chk(BinsearchIndex<WordType, IndexBits, DataBits>* a,
+                                const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
+        // TODO: tranform into RLE if a container is full
+        // TODO: handle full RLE specifically
+
+        a->expand_to(a->size + b->size);
+        size_t i = 0, j = 0;
+        bool changed = false;
+        while (true) {
+            if (a->containers[i].index == b->containers[j].index) {
+                // TODO: only do this if a->containers[i] is full
+                CTy local_res_type;
+                bool local_changed = false;
+                auto new_container = froaring_ori_changed_chk<WordType, DataBits>(
+                    a->containers[i].ptr, b->containers[j].ptr, a->containers[i].type, b->containers[j].type,
+                    local_res_type, local_changed);
+                changed |= local_changed;
+                if (new_container != a->containers[i].ptr) {  // New container is created: release the old one
+                    release_container<WordType, DataBits>(a->containers[i].ptr, a->containers[i].type);
+                }
+                a->containers[i].ptr = new_container;
+                a->containers[i].type = local_res_type;
+                ++i;
+                ++j;
+                if (i == a->size) break;
+                if (j == b->size) break;
+            } else if (a->containers[i].index < b->containers[j].index) {
+                i++;
+                if (i == a->size) break;
+            } else {             // the index in a > the index in b
+                changed = true;  // MODIFIED!
+                // we duplicate the container in b, then insert it
+                // TODO: will this be faster if we try to move more than 1 each time?
+                std::memmove(&a->containers[i + 1], &a->containers[i], (a->size - i) * sizeof(ContainerHandle));
+                a->containers[i] = duplicate_container<WordType, IndexType, DataBits>(b->containers[j]);
+                a->size++;
+                i++;
+                j++;
+                if (j == b->size) break;
+            }
+        }
+
+        // If containers in a is exhausted, we need to copy possible containers left in b:
+        if (i == a->size) {
+            a->expand_to(a->size + (b->size - j));
+            a->size += b->size - j;
+            while (j < b->size) {
+                changed = true;  // MODIFIED!
+                a->containers[i] = duplicate_container<WordType, IndexType, DataBits>(b->containers[j]);
+                i++;
+                j++;
+            }
+        }
+        return changed;
+    }
+
     static void diffi(BinsearchIndex<WordType, IndexBits, DataBits>* a,
                       const BinsearchIndex<WordType, IndexBits, DataBits>* b) {
         SizeType i = 0, j = 0;

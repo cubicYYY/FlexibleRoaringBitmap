@@ -89,7 +89,7 @@ bool froaring_contains_ra(const RLEContainer<WordType, DataBits>* a, const Array
     if (b->size > a->cardinality()) {
         return false;
     }
-    int i_array = 0, i_run = 0;
+    size_t i_array = 0, i_run = 0;
     while (i_array < b->size && i_run < a->run_count) {
         typename RLEContainer<WordType, DataBits>::SizeType start = a->runs[i_run].start;
         typename RLEContainer<WordType, DataBits>::SizeType stop = a->runs[i_run].end;

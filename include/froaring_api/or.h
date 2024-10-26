@@ -173,7 +173,7 @@ template <typename WordType, size_t DataBits>
 froaring_container_t* froaring_or_ar(const ArrayContainer<WordType, DataBits>* a,
                                      const RLEContainer<WordType, DataBits>* b, CTy& result_type) {
     result_type = CTy::RLE;
-
+    // FIXME: RLE container may overflow!
     auto* result = new RLEContainer<WordType, DataBits>(*b);
     auto array_size = a->size;
     for (size_t i = 0; i < array_size; i++) {
